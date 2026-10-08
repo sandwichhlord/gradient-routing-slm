@@ -1,0 +1,3 @@
+# keep shell scripts LF so they run on Kaggle/Linux even when committed from Windows
+*.sh text eol=lf
+*.py text eol=lf
