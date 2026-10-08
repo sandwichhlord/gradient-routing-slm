@@ -1,4 +1,4 @@
-"""Quick CPU checks of the block-split MLP hooks. Run: python tests/test_model.py"""
+"""Quick CPU checks of the block-split MLP hooks. Run: python -m pytest tests/ (or python tests/test_model.py)"""
 import os
 import sys
 
@@ -46,6 +46,10 @@ def main():
         model.record_block_norms(False)
         assert torch.equal(model(x, x)[0], base)
     print("tests/test_model.py: all checks passed")
+
+
+def test_block_hooks():
+    main()
 
 
 if __name__ == "__main__":

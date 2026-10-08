@@ -7,6 +7,8 @@ Config precedence: built-in DEFAULTS < --config file (e.g. configs/baseline.py) 
 
 fp16 autocast + GradScaler on CUDA (no bf16, no torch.compile); fp32 on CPU.
 Writes out_dir/metrics.csv (iter, train_loss, val_story, val_math, val_code, lr, elapsed_s) and out_dir/ckpt.pt.
+--routing turns on activation-based gradient routing (model/routing.py) and also writes out_dir/routing_stats.csv;
+train_loss is always the LM loss alone (the routing aux loss is logged separately).
 """
 import argparse
 import csv
@@ -23,6 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (DOMAINS, ROOT, autocast_ctx, eval_domains, get_batch, load_config_file,  # noqa: E402
                     load_val, make_grad_scaler, open_bin, pick_device)
 from model.model import GPT, GPTConfig  # noqa: E402
+from model.routing import GradientRouter  # noqa: E402
 
 DEFAULTS = dict(
     # io
@@ -38,6 +41,8 @@ DEFAULTS = dict(
     weight_decay=0.1, beta1=0.9, beta2=0.95, grad_clip=1.0,
     # logging / eval
     eval_interval=250, eval_iters=50, log_interval=50, ckpt_interval=1000,
+    # gradient routing (off by default -> plain dense training)
+    routing=False, route_k=2, route_eps=0.0, route_lambda=0.01, route_ema=0.99, route_mask_aux=False,
 )
 
 
@@ -113,11 +118,18 @@ def main(argv=None):
     optimizer = model.configure_optimizers(c["weight_decay"], c["learning_rate"], (c["beta1"], c["beta2"]))
     scaler = make_grad_scaler(device)
     ctx = autocast_ctx(device)
+    router = None
+    if c["routing"]:
+        router = GradientRouter(model, k=c["route_k"], epsilon=c["route_eps"], aux_lambda=c["route_lambda"],
+                                ema=c["route_ema"], mask_aux=c["route_mask_aux"])
+        print(f"[train] gradient routing ON: top-{c['route_k']} of {c['n_blocks']} blocks per layer, "
+              f"eps={c['route_eps']}, lambda={c['route_lambda']}, ema={c['route_ema']}, mask_aux={c['route_mask_aux']}")
     print(f"[train] device={device} amp={'fp16' if device.startswith('cuda') else 'off'} "
           f"params={model.num_params() / 1e6:.2f}M (non-embedding {(model.num_params() - model.transformer.wte.weight.numel()) / 1e6:.2f}M)")
 
     ckpt_path = os.path.join(c["out_dir"], "ckpt.pt")
     metrics_path = os.path.join(c["out_dir"], "metrics.csv")
+    routing_path = os.path.join(c["out_dir"], "routing_stats.csv")
     start_iter = 0
     if c["resume"] and os.path.exists(ckpt_path):
         ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
@@ -126,15 +138,20 @@ def main(argv=None):
         if ckpt.get("scaler"):
             scaler.load_state_dict(ckpt["scaler"])
         start_iter = ckpt["iter"]
+        if router is not None and ckpt.get("router"):
+            router.load_state_dict(ckpt["router"])
         print(f"[train] resumed from {ckpt_path} at iter {start_iter}")
     else:
         with open(metrics_path, "w", newline="") as f:
             csv.writer(f).writerow(["iter", "train_loss", *[f"val_{d}" for d in DOMAINS], "lr", "elapsed_s"])
+        if os.path.exists(routing_path):
+            os.remove(routing_path)
 
     def save_ckpt(it):
         tmp = ckpt_path + ".tmp"
         torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "scaler": scaler.state_dict(),
-                    "model_args": model_args, "config": c, "iter": it}, tmp)
+                    "model_args": model_args, "config": c, "iter": it,
+                    "router": router.state_dict() if router is not None else None}, tmp)
         os.replace(tmp, ckpt_path)  # atomic: a crash mid-save never corrupts the last good checkpoint
         print(f"[train] saved checkpoint @ iter {it} -> {ckpt_path}", flush=True)
 
@@ -144,6 +161,9 @@ def main(argv=None):
             csv.writer(f).writerow([it, f"{train_loss:.5f}", *[f"{losses[d]:.5f}" for d in DOMAINS], f"{lr:.3e}",
                                     f"{time.time() - t_start:.1f}"])
         print(f"[eval] iter {it}: train {train_loss:.4f} | " + " | ".join(f"{d} {losses[d]:.4f}" for d in DOMAINS), flush=True)
+        if router is not None and router.steps > 0:
+            router.log(it, routing_path)
+            print(f"[route] iter {it}: {router.summary()}", flush=True)
 
     model.train()
     t_start = time.time()
@@ -164,9 +184,12 @@ def main(argv=None):
         for _ in range(c["grad_accum"]):
             with ctx:
                 _, loss = model(x, y)
-                loss = loss / c["grad_accum"]
+                aux = router.route() if router is not None else None
             x, y = get_batch(train_data, c["batch_size"], c["block_size"], device)  # prefetch next
-            scaler.scale(loss).backward()
+            if router is None:
+                scaler.scale(loss / c["grad_accum"]).backward()
+            else:
+                router.backward(loss / c["grad_accum"], aux / c["grad_accum"], scaler.scale)
         if c["grad_clip"] > 0:
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), c["grad_clip"])
@@ -174,7 +197,7 @@ def main(argv=None):
         scaler.update()
         optimizer.zero_grad(set_to_none=True)
 
-        loss_val = loss.item() * c["grad_accum"]
+        loss_val = loss.item()
         if not math.isfinite(loss_val):
             raise FloatingPointError(f"non-finite loss {loss_val} at iter {it}")
         running.append(loss_val)
@@ -196,7 +219,10 @@ def main(argv=None):
 
     if start_iter >= c["max_iters"]:
         print(f"[train] checkpoint already at iter {start_iter} >= max_iters; nothing to do")
+    if router is not None:
+        print(f"[route] final: {router.summary()}")
     print(f"[train] finished in {fmt_time(time.time() - t_start)}")
+    return {"model": model, "router": router, "config": c}
 
 
 if __name__ == "__main__":
