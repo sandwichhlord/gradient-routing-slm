@@ -63,20 +63,35 @@ class BlockMLP(nn.Module):
         # hooks (off by default)
         self.block_mask = None          # None or float tensor (n_blocks,)
         self.record_norms = False
+        self.capture_energy = False     # in training mode, keep differentiable per-block energy (routing)
+        self.energy = None              # (n_blocks,) mean over tokens of ||h_b||_2, set by forward
+        self.energy_detach_input = False  # compute energy on a side graph from x.detach() (routing's default)
         self.reset_norms()
 
     def reset_norms(self):
         self.norm_sum = torch.zeros(self.n_blocks)
         self.norm_count = 0
 
+    def _energy(self, h):
+        """(n_blocks,) mean over tokens of each block's L2 norm."""
+        return h.float().view(*h.shape[:-1], self.n_blocks, self.block_dim).norm(dim=-1).reshape(-1, self.n_blocks).mean(0)
+
     def forward(self, x):
         h = self.gelu(self.c_fc(x))
-        if self.block_mask is not None or self.record_norms:
+        capture = self.capture_energy and self.training
+        if capture and self.energy_detach_input:
+            # separate graph whose only parameters are this layer's c_fc (so its gradient can bypass routing masks)
+            self.energy = self._energy(self.gelu(F.linear(x.detach(), self.c_fc.weight, self.c_fc.bias)))
+        if self.block_mask is not None or self.record_norms or capture:
             hb = h.view(*h.shape[:-1], self.n_blocks, self.block_dim)
-            if self.record_norms:
-                norms = hb.detach().float().norm(dim=-1)  # (B, T, n_blocks)
-                self.norm_sum += norms.reshape(-1, self.n_blocks).sum(0).cpu()
-                self.norm_count += norms.numel() // self.n_blocks
+            if self.record_norms or (capture and not self.energy_detach_input):
+                norms = hb.float().norm(dim=-1)  # (B, T, n_blocks)
+                if capture and not self.energy_detach_input:
+                    self.energy = norms.reshape(-1, self.n_blocks).mean(0)
+                if self.record_norms:
+                    norms = norms.detach()
+                    self.norm_sum += norms.reshape(-1, self.n_blocks).sum(0).cpu()
+                    self.norm_count += norms.numel() // self.n_blocks
             if self.block_mask is not None:
                 mask = self.block_mask.to(device=h.device, dtype=h.dtype)
                 hb = hb * mask.view(*([1] * (hb.dim() - 2)), self.n_blocks, 1)
