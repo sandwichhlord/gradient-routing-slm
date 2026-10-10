@@ -1,0 +1,81 @@
+# samples from checkpoint @ iter 5000 (temperature=0.8, top_k=200, max_new_tokens=120)
+
+=== prompt: 'Once upon a time' | sample 1 ===
+Once upon a time there was an enthusiastic little girl who loved to play outside. One day she was playing with her friend, a girl named Lily. She was very obedient and always looked at the world around her.
+
+One day, Lily decided to visit the sky. She followed the window and saw many wonderful flowers. She saw birds singing and butterflies, and the birds. Lily loved to watch the birds smile.
+
+As she walked through the sky, she felt a bright feeling in her backyard. When the sun came out, Lily showed her mom. Her mom said, "That's a beautiful flower in
+
+=== prompt: 'Once upon a time' | sample 2 ===
+Once upon a time there was a little boy who was very hungry. He had to wait for the library to find food and have enough food.
+
+One day later, he went to ask his mom for help. His mom said, "Come and take us to the library!" She took him to the library, but the little boy wanted to win. He said, "Mom, I want to explore the library!"
+
+His mom said, "Of course, you can't wait and find out." So, the little boy went to the library and got a big box. He looked up and saw many
+
+=== prompt: 'Once upon a time' | sample 3 ===
+Once upon a time there lived a tidy little girl. One day she went to the park with her mom. 
+
+Her mom said, "Let's go for a walk!" They had a cold, warm day and bravely walked. 
+
+As they walked, they saw a man walking towards them. The man was wearing a hat and looked friendly. 
+
+The girl asked her mom if she could take a walk. Her mom said yes and they went to the park. The lady was so glad to see the lady.
+
+As they were walking, the lady said, "Hi there
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 1 ===
+Q: 37 + 48 = A: 88
+Q: 667 - 1 = A: 674
+Q: 691 - 33 = A: 695
+Q: 9 + 845 = A: 845
+Q: 1 + 851 = A: 856
+Q: 642 - 1 = A: 649
+Q: 1 + 0 = A: 1
+Q: 7 + 0 = A: 7
+Q: 15 x 58 = A: 730
+Q: 0 - 903 = A: -975
+Q: 9 x 75 = A: 675
+Q: 4 x
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 2 ===
+Q: 37 + 48 = A: 80
+Q: 32 + 6 = A: 38
+Q: 53 - 22 = A: 34
+Q: 7 x 0 = A: 0
+Q: 73 + 1 = A: 76
+Q: 6 x 6 = A: 36
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 3 ===
+Q: 37 + 48 = A: 81
+Q: 26 - 5 = A: 21
+Q: 521 x 6 = A: 3776
+Q: 4 + 9 = A: 13
+Q: 8 - 4 = A: 4
+Q: 1 + 7 = A: 8
+Q: 42 + 3 = A: 46
+Q: 9 x 7 = A: 63
+Q: 0 x 7 = A: 0
+Q: 7 - 49 = A: -41
+Q: 9 x 8 = A: 72
+Q: 774 - 9 = A: 771
+Q: 7
+
+=== prompt: 'def add(a, b):' | sample 1 ===
+def add(a, b):
+                                                                                                                       
+
+=== prompt: 'def add(a, b):' | sample 2 ===
+def add(a, b):
+        o = b.read(),
+        o.rstrip()
+        if (a, b, b, m, b) in ('a', b, b, b)):
+            o = b.read(X)
+    return o
+
+def get_list(a=None, b='None', b=None:None, b=None, b=None, b
+
+=== prompt: 'def add(a, b):' | sample 3 ===
+def add(a, b): #
+                                                                                                                      

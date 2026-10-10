@@ -1,0 +1,30 @@
+%%{init: {"flowchart": {"wrappingWidth": 360, "nodeSpacing": 35, "rankSpacing": 50}}}%%
+flowchart LR
+    PREP["1. Data prep (data/prepare.py)<br/>TinyStories + synthetic math + code<br/>train.bin and per-domain val_*.bin"]
+
+    PREP --> DENSE["2. Dense baseline training<br/>configs/baseline.py, routing off"]
+    PREP --> LOOP
+
+    subgraph LOOP["3. Routed training step (train.py --routing, configs/routed.py)"]
+        direction TB
+        S["Activation scoring<br/>a_lb = mean token L2 norm per MLP block"]
+        S --> T["Top-k gradient masking<br/>LM-loss gradient reaches only top-2 blocks per layer"]
+        T --> B["Load balancing<br/>EMA selection frequency + aux loss, log routing_stats.csv"]
+    end
+
+    DENSE -. "planned: start routed run from dense checkpoint" .-> LOOP
+
+    DENSE --> EVAL
+    LOOP --> EVAL
+
+    subgraph EVAL["4. Evaluation (same code for both arms)"]
+        direction TB
+        CURVES["Per-domain val loss curves and samples"]
+        ABL["Ablation matrix (eval/ablate.py)<br/>zero each layer.block: loss increase per domain, specialization S"]
+        PROBE["Domain probes (planned)"]
+    end
+
+    EVAL --> CMP["5. Compare dense vs routed<br/>mean S, damage concentration, per-domain loss"]
+
+    classDef planned stroke-dasharray: 5 5,fill:#f0efec,stroke:#898781,color:#0b0b0b
+    class PROBE planned
