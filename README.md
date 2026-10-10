@@ -4,6 +4,50 @@ Train a small GPT (nanoGPT-style) on a 3-domain corpus (stories, arithmetic, Pyt
 
 The MLP hidden layer in every transformer layer is split into `n_blocks` (8) equal blocks. The baseline trains as an ordinary dense model. The block hooks (ablation mask and per-block activation norms) only switch on at inference, and are there for later gradient-routing experiments.
 
+## Module status
+
+| Module | Status |
+|---|---|
+| Data pipeline (`data/prepare.py`) | Completed. Real data (41M tokens) built and used on a T4. |
+| Baseline training (`train.py`, `configs/baseline.py`) | Completed. 5000 iterations on a T4, results below. |
+| Routing module (`model/routing.py`) | Ongoing: implemented and unit-tested. No full-scale routed run yet. |
+| Evaluation harness (`eval/`) | Ongoing: loss curves, samples and the ablation matrix are done; domain probes are pending. |
+
+## Results so far
+
+Dense baseline only (no routed run exists yet). Kaggle T4, fp16, 5000 iterations, 10.6M non-embedding parameters (29.9M with the tied embedding), real data. Raw files are in [`results/baseline/`](results/baseline/).
+
+**Final validation loss** (nats/token, last eval at iteration 5000):
+
+| Domain | Val loss | Start (iter 0) |
+|---|---|---|
+| story (TinyStories) | 2.120 | 10.89 |
+| math (synthetic) | 1.467 | 10.90 |
+| code (codeparrot) | 2.497 | 10.57 |
+
+Final training loss (running mean over the last 250 iterations) is 2.042. Math loss is not a measure of arithmetic skill: the operand digits are random and cannot be predicted, so the loss has a high floor.
+
+![Train and per-domain validation loss](results/baseline/loss_curves.png)
+
+**Ablation (zeroing one MLP block at a time, all 48 blocks).** Mean specialization **S = 0.051** (damage-weighted 0.059; the most specialised block, 5.4, reaches S = 0.19). Every single-block ablation raises the loss on every domain, and by less than 0.1 nats. The damage is mostly a layer effect: zeroing a block in layer 0 costs about 0.12 nats in total on average, against 0.014-0.025 nats for blocks in layers 1-5.
+
+![Loss increase when one MLP block is zeroed](results/baseline/ablation_heatmap.png)
+
+**One sample per domain** (checkpoint at iteration 5000, temperature 0.8; full set in `results/baseline/samples.txt`):
+
+- Story, prompt `Once upon a time`:
+  > Once upon a time there lived a tidy little girl. One day she went to the park with her mom. Her mom said, "Let's go for a walk!" They had a cold, warm day and bravely walked. As they walked, they saw a man walking towards them.
+- Math, prompt `Q: 37 + 48 = A:`:
+  > Q: 37 + 48 = A: 81 / Q: 26 - 5 = A: 21 / Q: 521 x 6 = A: 3776 / Q: 4 + 9 = A: 13 / Q: 9 x 7 = A: 63
+
+  The format is learned. Small sums and products are mostly right, but the prompt itself is wrong (the answer is 85) and the 3-digit product is wrong (521 x 6 = 3126).
+- Code, prompt `def add(a, b):`:
+  > def add(a, b): o = b.read(), o.rstrip() ... return o / def get_list(a=None, b='None', b=None:None, b=None, ...
+
+  Code-like in style but not valid or meaningful. Two of the three code samples were just runs of whitespace.
+
+**Interpretation.** The dense baseline shows low specialization, as expected for a model trained with no pressure to separate domains: S = 0.05 is close to the 0 end of the scale, and no block among the 48 is strongly tied to one domain. What differs between blocks is how much they matter overall, mainly by layer, not which domain they matter for. This is a single seed, with each ablation measured on 20 batches per domain, and the damages are small, so small differences in S between blocks should not be read as real. There is no routed run yet, so these numbers are the reference that a routed model has to beat, and nothing here says whether routing helps.
+
 ## Quick start
 
 ```bash
@@ -62,7 +106,7 @@ Let $h_{l,b}(t) \in \mathbb{R}^{d/n}$ be the post-GELU hidden activation of bloc
 
 **Why the aux gradient bypasses the mask (`route_mask_aux=False`, the default).** In the default mode, $a_{l,b}$ for the aux term is recomputed on a side graph from `x.detach()`, so its gradient reaches only that layer's `c_fc` rows, and it is not masked. This is the same role the balancing loss plays for an MoE router.
 
-If the aux gradient is masked as well (`--route_mask_aux`), training collapses. A block that loses selection gets no gradient that could make it win again, while AdamW weight decay shrinks it, so routing locks onto a fixed $k$ blocks per layer. In the 100-iteration smoke run at $\lambda=0.01$, 9 of 16 blocks were never selected. Over 300 iterations, 12 of 16 were dead (that is, exactly $k$ alive per layer). Even $\lambda=1$ left 6 of 16 idle. `tests/test_routing.py::test_literal_masking_lets_blocks_die` records this behaviour.
+If the aux gradient is masked as well (`--route_mask_aux`), training collapses. A block that loses selection gets no gradient that could make it win again, so routing locks onto a fixed $k$ blocks per layer (the likely role of AdamW weight decay in shrinking idle blocks was not isolated). In the 100-iteration smoke run at $\lambda=0.01$, 9 of 16 blocks were never selected. Over 300 iterations, 12 of 16 were idle in the last 50 iterations (exactly $k$ alive per layer). Even $\lambda=1$ left 6 of 16 idle. Details in [`docs/findings.md`](docs/findings.md). `tests/test_routing.py::test_literal_masking_lets_blocks_die` records this behaviour.
 
 In the default mode, idle blocks keep receiving balancing gradient and do come back into selection. One block per layer still tends to win a slot on most steps.
 
@@ -75,16 +119,18 @@ Tests (`python -m pytest tests/`) check the following:
 - (b) With routing off, gradients are dense, and `router.remove()` restores dense gradients bit-for-bit.
 - (c) After 100 smoke iterations, no block is dead: every block has been selected, and every currently unselected block still receives gradient.
 
-## Runtime on a T4 (estimate)
+## Runtime on a T4
+
+Measured on the dense baseline run (Kaggle T4, `results/baseline/run.log`):
 
 | Stage | Time |
 |---|---|
-| pip + clone | ~1 min |
-| prepare (41.5M tokens streamed + tokenized) | ~3–6 min (network bound; measured ~150–200K tok/s locally) |
-| train (5000 iters × 8192 tokens, ~30M params incl. tied embedding, fp16) | ~10–15 min |
-| sample + plots | <1 min |
-| ablate (48 blocks × 3 domains × 20 batches) | ~2–3 min |
+| prepare (41M tokens streamed + tokenized) | 53 s |
+| train (5000 iters × 8192 tokens, fp16) | 19 min 25 s (about 185 ms/iter, plus eval every 250 iters) |
+| sample + plots | 8 s |
+| ablate (48 blocks × 3 domains × 20 batches) | 3 min 33 s |
+| **total** | **24 min 15 s** |
 
-`train.py` prints a measured ETA every 50 iterations. The ETA includes eval and checkpoint overhead.
+The total is inside the 20-30 minute range I had estimated, but training took longer than my earlier 10-15 minute estimate. `train.py` prints a measured ETA every 50 iterations, which includes eval and checkpoint overhead.
 
-A routed run costs a little more per iteration. It re-runs each layer's `c_fc` on detached inputs and does a second, small backward pass for the aux loss, adding roughly 10% (estimated, not measured on a T4).
+A routed run costs a little more per iteration. It re-runs each layer's `c_fc` on detached inputs and does a second, small backward pass for the aux loss, adding roughly 10% (an estimate, not measured on a T4); expect about 25-30 minutes for the routed pipeline.

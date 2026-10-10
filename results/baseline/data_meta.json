@@ -1,0 +1,29 @@
+{
+  "mode": "real",
+  "signature": {
+    "story_tokens": 20000000,
+    "math_tokens": 10000000,
+    "code_tokens": 10000000,
+    "val_tokens": 500000,
+    "max_doc_tokens": 4096,
+    "synthetic": false,
+    "synthetic_tokens": 200000,
+    "seed": 1337
+  },
+  "vocab_size": 50257,
+  "eot": 50256,
+  "domains": [
+    "story",
+    "math",
+    "code"
+  ],
+  "train_tokens": 40623542,
+  "train_tokens_per_domain": {
+    "story": 20005009,
+    "math": 10030871,
+    "code": 10587662
+  },
+  "val_story_tokens": 500021,
+  "val_math_tokens": 500101,
+  "val_code_tokens": 500263
+}

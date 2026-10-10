@@ -1,0 +1,323 @@
+
+=================== [1/5] prepare data  (t=0s) ===================
+[prepare] collecting story: 20,500,000 tokens
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+  [story] 2.0M / 20.5M tokens (18s)
+  [story] 4.1M / 20.5M tokens (19s)
+  [story] 6.1M / 20.5M tokens (21s)
+  [story] 8.1M / 20.5M tokens (22s)
+  [story] 10.1M / 20.5M tokens (24s)
+  [story] 12.2M / 20.5M tokens (25s)
+  [story] 14.2M / 20.5M tokens (26s)
+  [story] 16.2M / 20.5M tokens (27s)
+  [story] 18.3M / 20.5M tokens (29s)
+  [story] 20.3M / 20.5M tokens (30s)
+[prepare] story: 91200 train docs, 2240 val docs (30s)
+[prepare] collecting math: 10,500,000 tokens
+  [math] 2.0M / 10.5M tokens (2s)
+  [math] 4.0M / 10.5M tokens (3s)
+  [math] 6.0M / 10.5M tokens (5s)
+  [math] 8.0M / 10.5M tokens (7s)
+  [math] 10.0M / 10.5M tokens (9s)
+[prepare] math: 46085 train docs, 2299 val docs (9s)
+[prepare] collecting code: 10,500,000 tokens
+Repo card metadata block was not found. Setting CardData to empty.
+  [code] 2.2M / 10.5M tokens (3s)
+  [code] 4.5M / 10.5M tokens (5s)
+  [code] 6.7M / 10.5M tokens (6s)
+  [code] 8.8M / 10.5M tokens (8s)
+  [code] 11.1M / 10.5M tokens (9s)
+[prepare] code: 4902 train docs, 218 val docs (9s)
+[prepare] done (real): {"mode": "real", "vocab_size": 50257, "eot": 50256, "domains": ["story", "math", "code"], "train_tokens": 40623542, "train_tokens_per_domain": {"story": 20005009, "math": 10030871, "code": 10587662}, "val_story_tokens": 500021, "val_math_tokens": 500101, "val_code_tokens": 500263}
+
+=================== [2/5] train  (t=53s) ===================
+[train] GPU: Tesla T4
+[train] train tokens: 40,623,542 | val_story: 500,021 | val_math: 500,101 | val_code: 500,263
+[train] device=cuda amp=fp16 params=29.94M (non-embedding 10.62M)
+[eval] iter 0: train 10.8264 | story 10.8950 | math 10.9027 | code 10.5724
+[train] iter 50/5000 loss 7.1905 lr 1.49e-04 381ms/it | elapsed 0m19s | ETA 31m28s
+[train] iter 100/5000 loss 4.5754 lr 2.99e-04 172ms/it | elapsed 0m27s | ETA 22m36s
+[train] iter 150/5000 loss 4.2437 lr 4.48e-04 174ms/it | elapsed 0m36s | ETA 19m36s
+[train] iter 200/5000 loss 4.0258 lr 5.97e-04 177ms/it | elapsed 0m45s | ETA 18m05s
+[train] iter 250/5000 loss 3.6378 lr 6.00e-04 180ms/it | elapsed 0m54s | ETA 17m10s
+[eval] iter 250: train 5.2511 | story 4.0189 | math 2.1370 | code 4.1067
+[train] iter 300/5000 loss 3.6024 lr 5.99e-04 387ms/it | elapsed 1m13s | ETA 19m12s
+[train] iter 350/5000 loss 3.4703 lr 5.99e-04 189ms/it | elapsed 1m22s | ETA 18m22s
+[train] iter 400/5000 loss 3.2581 lr 5.98e-04 193ms/it | elapsed 1m32s | ETA 17m45s
+[train] iter 450/5000 loss 3.5215 lr 5.96e-04 195ms/it | elapsed 1m42s | ETA 17m15s
+[train] iter 500/5000 loss 3.3364 lr 5.95e-04 193ms/it | elapsed 1m52s | ETA 16m48s
+[eval] iter 500: train 3.3218 | story 3.3874 | math 1.8835 | code 3.6571
+[train] iter 550/5000 loss 3.0575 lr 5.93e-04 401ms/it | elapsed 2m12s | ETA 17m49s
+[train] iter 600/5000 loss 2.9973 lr 5.91e-04 184ms/it | elapsed 2m21s | ETA 17m16s
+[train] iter 650/5000 loss 3.0611 lr 5.88e-04 184ms/it | elapsed 2m30s | ETA 16m47s
+[train] iter 700/5000 loss 2.7812 lr 5.86e-04 185ms/it | elapsed 2m39s | ETA 16m21s
+[train] iter 750/5000 loss 2.7762 lr 5.83e-04 186ms/it | elapsed 2m49s | ETA 15m58s
+[eval] iter 750: train 2.9917 | story 3.1071 | math 1.8122 | code 3.4441
+[train] iter 800/5000 loss 2.6813 lr 5.80e-04 402ms/it | elapsed 3m09s | ETA 16m33s
+[train] iter 850/5000 loss 2.7798 lr 5.76e-04 189ms/it | elapsed 3m18s | ETA 16m10s
+[train] iter 900/5000 loss 2.8296 lr 5.72e-04 189ms/it | elapsed 3m28s | ETA 15m48s
+[train] iter 950/5000 loss 2.6828 lr 5.68e-04 188ms/it | elapsed 3m37s | ETA 15m27s
+[train] iter 1000/5000 loss 2.4959 lr 5.64e-04 188ms/it | elapsed 3m46s | ETA 15m07s
+[eval] iter 1000: train 2.7971 | story 2.9188 | math 1.7463 | code 3.3349
+[train] saved checkpoint @ iter 1000 -> /tmp/repo/out/ckpt.pt
+[train] iter 1050/5000 loss 2.5785 lr 5.59e-04 409ms/it | elapsed 4m07s | ETA 15m30s
+[train] iter 1100/5000 loss 2.7119 lr 5.55e-04 187ms/it | elapsed 4m16s | ETA 15m10s
+[train] iter 1150/5000 loss 2.6327 lr 5.50e-04 188ms/it | elapsed 4m26s | ETA 14m50s
+[train] iter 1200/5000 loss 2.4556 lr 5.44e-04 188ms/it | elapsed 4m35s | ETA 14m32s
+[train] iter 1250/5000 loss 2.8477 lr 5.39e-04 188ms/it | elapsed 4m44s | ETA 14m14s
+[eval] iter 1250: train 2.6972 | story 2.7687 | math 1.7172 | code 3.2007
+[train] iter 1300/5000 loss 2.4612 lr 5.33e-04 403ms/it | elapsed 5m05s | ETA 14m28s
+[train] iter 1350/5000 loss 2.4899 lr 5.27e-04 189ms/it | elapsed 5m14s | ETA 14m10s
+[train] iter 1400/5000 loss 2.5577 lr 5.21e-04 189ms/it | elapsed 5m23s | ETA 13m52s
+[train] iter 1450/5000 loss 2.6773 lr 5.15e-04 189ms/it | elapsed 5m33s | ETA 13m36s
+[train] iter 1500/5000 loss 2.5850 lr 5.08e-04 188ms/it | elapsed 5m42s | ETA 13m19s
+[eval] iter 1500: train 2.5742 | story 2.6679 | math 1.6771 | code 3.1011
+[train] iter 1550/5000 loss 2.5934 lr 5.01e-04 401ms/it | elapsed 6m02s | ETA 13m27s
+[train] iter 1600/5000 loss 2.4108 lr 4.95e-04 188ms/it | elapsed 6m12s | ETA 13m10s
+[train] iter 1650/5000 loss 2.4360 lr 4.87e-04 188ms/it | elapsed 6m21s | ETA 12m54s
+[train] iter 1700/5000 loss 2.3384 lr 4.80e-04 188ms/it | elapsed 6m30s | ETA 12m38s
+[train] iter 1750/5000 loss 2.3248 lr 4.73e-04 188ms/it | elapsed 6m40s | ETA 12m23s
+[eval] iter 1750: train 2.4979 | story 2.5768 | math 1.6397 | code 3.0424
+[train] iter 1800/5000 loss 2.4422 lr 4.65e-04 401ms/it | elapsed 7m00s | ETA 12m27s
+[train] iter 1850/5000 loss 2.4333 lr 4.57e-04 188ms/it | elapsed 7m09s | ETA 12m11s
+[train] iter 1900/5000 loss 2.5099 lr 4.50e-04 188ms/it | elapsed 7m19s | ETA 11m56s
+[train] iter 1950/5000 loss 2.3547 lr 4.42e-04 188ms/it | elapsed 7m28s | ETA 11m41s
+[train] iter 2000/5000 loss 2.4468 lr 4.33e-04 188ms/it | elapsed 7m37s | ETA 11m26s
+[eval] iter 2000: train 2.4231 | story 2.4953 | math 1.6169 | code 2.9783
+[train] saved checkpoint @ iter 2000 -> /tmp/repo/out/ckpt.pt
+[train] iter 2050/5000 loss 2.4999 lr 4.25e-04 413ms/it | elapsed 7m58s | ETA 11m28s
+[train] iter 2100/5000 loss 2.3568 lr 4.17e-04 188ms/it | elapsed 8m08s | ETA 11m13s
+[train] iter 2150/5000 loss 2.4594 lr 4.09e-04 188ms/it | elapsed 8m17s | ETA 10m59s
+[train] iter 2200/5000 loss 2.2948 lr 4.00e-04 189ms/it | elapsed 8m26s | ETA 10m45s
+[train] iter 2250/5000 loss 2.0930 lr 3.91e-04 189ms/it | elapsed 8m36s | ETA 10m31s
+[eval] iter 2250: train 2.3760 | story 2.4354 | math 1.5929 | code 2.9166
+[train] iter 2300/5000 loss 2.0534 lr 3.83e-04 403ms/it | elapsed 8m56s | ETA 10m29s
+[train] iter 2350/5000 loss 2.3324 lr 3.74e-04 189ms/it | elapsed 9m05s | ETA 10m15s
+[train] iter 2400/5000 loss 2.1977 lr 3.65e-04 189ms/it | elapsed 9m15s | ETA 10m01s
+[train] iter 2450/5000 loss 2.3558 lr 3.57e-04 189ms/it | elapsed 9m24s | ETA 9m47s
+[train] iter 2500/5000 loss 2.3007 lr 3.48e-04 189ms/it | elapsed 9m34s | ETA 9m34s
+[eval] iter 2500: train 2.3264 | story 2.3879 | math 1.5745 | code 2.8605
+[train] iter 2550/5000 loss 2.1068 lr 3.39e-04 403ms/it | elapsed 9m54s | ETA 9m31s
+[train] iter 2600/5000 loss 2.2472 lr 3.30e-04 189ms/it | elapsed 10m03s | ETA 9m17s
+[train] iter 2650/5000 loss 2.2896 lr 3.21e-04 188ms/it | elapsed 10m13s | ETA 9m03s
+[train] iter 2700/5000 loss 2.1488 lr 3.13e-04 188ms/it | elapsed 10m22s | ETA 8m50s
+[train] iter 2750/5000 loss 2.1924 lr 3.04e-04 188ms/it | elapsed 10m31s | ETA 8m37s
+[eval] iter 2750: train 2.2680 | story 2.3369 | math 1.5547 | code 2.7981
+[train] iter 2800/5000 loss 2.2310 lr 2.95e-04 402ms/it | elapsed 10m52s | ETA 8m32s
+[train] iter 2850/5000 loss 2.3580 lr 2.86e-04 188ms/it | elapsed 11m01s | ETA 8m19s
+[train] iter 2900/5000 loss 2.0139 lr 2.77e-04 188ms/it | elapsed 11m10s | ETA 8m05s
+[train] iter 2950/5000 loss 2.2723 lr 2.69e-04 188ms/it | elapsed 11m20s | ETA 7m52s
+[train] iter 3000/5000 loss 2.3837 lr 2.60e-04 188ms/it | elapsed 11m29s | ETA 7m39s
+[eval] iter 3000: train 2.2302 | story 2.2979 | math 1.5368 | code 2.7362
+[train] saved checkpoint @ iter 3000 -> /tmp/repo/out/ckpt.pt
+[train] iter 3050/5000 loss 2.4707 lr 2.52e-04 415ms/it | elapsed 11m50s | ETA 7m34s
+[train] iter 3100/5000 loss 2.1130 lr 2.43e-04 188ms/it | elapsed 11m59s | ETA 7m21s
+[train] iter 3150/5000 loss 2.1493 lr 2.35e-04 189ms/it | elapsed 12m09s | ETA 7m08s
+[train] iter 3200/5000 loss 2.2319 lr 2.27e-04 189ms/it | elapsed 12m18s | ETA 6m55s
+[train] iter 3250/5000 loss 2.3274 lr 2.19e-04 189ms/it | elapsed 12m28s | ETA 6m42s
+[eval] iter 3250: train 2.2061 | story 2.2587 | math 1.5235 | code 2.6866
+[train] iter 3300/5000 loss 2.0460 lr 2.11e-04 403ms/it | elapsed 12m48s | ETA 6m35s
+[train] iter 3350/5000 loss 2.2770 lr 2.03e-04 189ms/it | elapsed 12m57s | ETA 6m23s
+[train] iter 3400/5000 loss 2.1870 lr 1.95e-04 189ms/it | elapsed 13m07s | ETA 6m10s
+[train] iter 3450/5000 loss 2.2263 lr 1.88e-04 189ms/it | elapsed 13m16s | ETA 5m57s
+[train] iter 3500/5000 loss 2.1166 lr 1.80e-04 189ms/it | elapsed 13m26s | ETA 5m45s
+[eval] iter 3500: train 2.1694 | story 2.2245 | math 1.5096 | code 2.6422
+[train] iter 3550/5000 loss 2.0463 lr 1.73e-04 403ms/it | elapsed 13m46s | ETA 5m37s
+[train] iter 3600/5000 loss 2.0668 lr 1.66e-04 189ms/it | elapsed 13m55s | ETA 5m25s
+[train] iter 3650/5000 loss 2.2677 lr 1.59e-04 189ms/it | elapsed 14m05s | ETA 5m12s
+[train] iter 3700/5000 loss 2.1899 lr 1.52e-04 189ms/it | elapsed 14m14s | ETA 5m00s
+[train] iter 3750/5000 loss 2.1200 lr 1.46e-04 189ms/it | elapsed 14m24s | ETA 4m48s
+[eval] iter 3750: train 2.1311 | story 2.1966 | math 1.4986 | code 2.6042
+[train] iter 3800/5000 loss 2.0920 lr 1.39e-04 403ms/it | elapsed 14m44s | ETA 4m39s
+[train] iter 3850/5000 loss 2.3121 lr 1.33e-04 188ms/it | elapsed 14m53s | ETA 4m26s
+[train] iter 3900/5000 loss 2.2120 lr 1.27e-04 189ms/it | elapsed 15m03s | ETA 4m14s
+[train] iter 3950/5000 loss 1.9752 lr 1.21e-04 189ms/it | elapsed 15m12s | ETA 4m02s
+[train] iter 4000/5000 loss 1.9039 lr 1.16e-04 189ms/it | elapsed 15m21s | ETA 3m50s
+[eval] iter 4000: train 2.1027 | story 2.1757 | math 1.4877 | code 2.5766
+[train] saved checkpoint @ iter 4000 -> /tmp/repo/out/ckpt.pt
+[train] iter 4050/5000 loss 1.9118 lr 1.11e-04 414ms/it | elapsed 15m42s | ETA 3m41s
+[train] iter 4100/5000 loss 2.2331 lr 1.06e-04 189ms/it | elapsed 15m52s | ETA 3m28s
+[train] iter 4150/5000 loss 2.1863 lr 1.01e-04 189ms/it | elapsed 16m01s | ETA 3m16s
+[train] iter 4200/5000 loss 2.1825 lr 9.63e-05 189ms/it | elapsed 16m11s | ETA 3m04s
+[train] iter 4250/5000 loss 2.0598 lr 9.20e-05 189ms/it | elapsed 16m20s | ETA 2m53s
+[eval] iter 4250: train 2.0913 | story 2.1567 | math 1.4813 | code 2.5436
+[train] iter 4300/5000 loss 2.2892 lr 8.79e-05 403ms/it | elapsed 16m40s | ETA 2m42s
+[train] iter 4350/5000 loss 2.1306 lr 8.41e-05 189ms/it | elapsed 16m50s | ETA 2m30s
+[train] iter 4400/5000 loss 2.1961 lr 8.06e-05 189ms/it | elapsed 16m59s | ETA 2m19s
+[train] iter 4450/5000 loss 2.1615 lr 7.74e-05 189ms/it | elapsed 17m08s | ETA 2m07s
+[train] iter 4500/5000 loss 1.9225 lr 7.44e-05 189ms/it | elapsed 17m18s | ETA 1m55s
+[eval] iter 4500: train 2.0774 | story 2.1388 | math 1.4756 | code 2.5216
+[train] iter 4550/5000 loss 2.0476 lr 7.17e-05 404ms/it | elapsed 17m38s | ETA 1m44s
+[train] iter 4600/5000 loss 2.4085 lr 6.92e-05 189ms/it | elapsed 17m48s | ETA 1m32s
+[train] iter 4650/5000 loss 2.2123 lr 6.71e-05 189ms/it | elapsed 17m57s | ETA 1m21s
+[train] iter 4700/5000 loss 1.9983 lr 6.52e-05 189ms/it | elapsed 18m07s | ETA 1m09s
+[train] iter 4750/5000 loss 1.9922 lr 6.36e-05 189ms/it | elapsed 18m16s | ETA 0m57s
+[eval] iter 4750: train 2.0665 | story 2.1289 | math 1.4687 | code 2.5062
+[train] iter 4800/5000 loss 2.0199 lr 6.23e-05 403ms/it | elapsed 18m36s | ETA 0m46s
+[train] iter 4850/5000 loss 2.1314 lr 6.13e-05 189ms/it | elapsed 18m46s | ETA 0m34s
+[train] iter 4900/5000 loss 2.0485 lr 6.06e-05 189ms/it | elapsed 18m55s | ETA 0m23s
+[train] iter 4950/5000 loss 2.0079 lr 6.02e-05 188ms/it | elapsed 19m04s | ETA 0m11s
+[train] iter 5000/5000 loss 2.1863 lr 6.00e-05 188ms/it | elapsed 19m14s | ETA 0m00s
+[eval] iter 5000: train 2.0419 | story 2.1201 | math 1.4666 | code 2.4974
+[train] saved checkpoint @ iter 5000 -> /tmp/repo/out/ckpt.pt
+[train] finished in 19m25s
+
+=================== [3/5] sample  (t=1229s) ===================
+# samples from checkpoint @ iter 5000 (temperature=0.8, top_k=200, max_new_tokens=120)
+
+=== prompt: 'Once upon a time' | sample 1 ===
+Once upon a time there was an enthusiastic little girl who loved to play outside. One day she was playing with her friend, a girl named Lily. She was very obedient and always looked at the world around her.
+
+One day, Lily decided to visit the sky. She followed the window and saw many wonderful flowers. She saw birds singing and butterflies, and the birds. Lily loved to watch the birds smile.
+
+As she walked through the sky, she felt a bright feeling in her backyard. When the sun came out, Lily showed her mom. Her mom said, "That's a beautiful flower in
+
+=== prompt: 'Once upon a time' | sample 2 ===
+Once upon a time there was a little boy who was very hungry. He had to wait for the library to find food and have enough food.
+
+One day later, he went to ask his mom for help. His mom said, "Come and take us to the library!" She took him to the library, but the little boy wanted to win. He said, "Mom, I want to explore the library!"
+
+His mom said, "Of course, you can't wait and find out." So, the little boy went to the library and got a big box. He looked up and saw many
+
+=== prompt: 'Once upon a time' | sample 3 ===
+Once upon a time there lived a tidy little girl. One day she went to the park with her mom. 
+
+Her mom said, "Let's go for a walk!" They had a cold, warm day and bravely walked. 
+
+As they walked, they saw a man walking towards them. The man was wearing a hat and looked friendly. 
+
+The girl asked her mom if she could take a walk. Her mom said yes and they went to the park. The lady was so glad to see the lady.
+
+As they were walking, the lady said, "Hi there
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 1 ===
+Q: 37 + 48 = A: 88
+Q: 667 - 1 = A: 674
+Q: 691 - 33 = A: 695
+Q: 9 + 845 = A: 845
+Q: 1 + 851 = A: 856
+Q: 642 - 1 = A: 649
+Q: 1 + 0 = A: 1
+Q: 7 + 0 = A: 7
+Q: 15 x 58 = A: 730
+Q: 0 - 903 = A: -975
+Q: 9 x 75 = A: 675
+Q: 4 x
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 2 ===
+Q: 37 + 48 = A: 80
+Q: 32 + 6 = A: 38
+Q: 53 - 22 = A: 34
+Q: 7 x 0 = A: 0
+Q: 73 + 1 = A: 76
+Q: 6 x 6 = A: 36
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 3 ===
+Q: 37 + 48 = A: 81
+Q: 26 - 5 = A: 21
+Q: 521 x 6 = A: 3776
+Q: 4 + 9 = A: 13
+Q: 8 - 4 = A: 4
+Q: 1 + 7 = A: 8
+Q: 42 + 3 = A: 46
+Q: 9 x 7 = A: 63
+Q: 0 x 7 = A: 0
+Q: 7 - 49 = A: -41
+Q: 9 x 8 = A: 72
+Q: 774 - 9 = A: 771
+Q: 7
+
+=== prompt: 'def add(a, b):' | sample 1 ===
+def add(a, b):
+                                                                                                                       
+
+=== prompt: 'def add(a, b):' | sample 2 ===
+def add(a, b):
+        o = b.read(),
+        o.rstrip()
+        if (a, b, b, m, b) in ('a', b, b, b)):
+            o = b.read(X)
+    return o
+
+def get_list(a=None, b='None', b=None:None, b=None, b=None, b
+
+=== prompt: 'def add(a, b):' | sample 3 ===
+def add(a, b): #
+                                                                                                                      
+
+[sample] wrote /tmp/repo/out/samples.txt
+
+=================== [4/5] plots  (t=1235s) ===================
+[plots] wrote /tmp/repo/out/loss_curves.png
+
+=================== [5/5] ablate  (t=1237s) ===================
+[ablate] mask check passed: ablating L0.B0 changes logits by up to 3.4395; all-ones mask and clear_ablation() reproduce the dense model
+[ablate] unablated: story 2.1149 | math 1.4645 | code 2.4911
+[ablate] 1/48 L0.B0: story +0.0485 math +0.0323 code +0.0997 | S=0.100 | ETA 407s
+[ablate] 2/48 L0.B1: story +0.0383 math +0.0214 code +0.0598 | S=0.072 | ETA 298s
+[ablate] 3/48 L0.B2: story +0.0385 math +0.0309 code +0.0559 | S=0.028 | ETA 260s
+[ablate] 4/48 L0.B3: story +0.0289 math +0.0128 code +0.0382 | S=0.077 | ETA 240s
+[ablate] 5/48 L0.B4: story +0.0346 math +0.0202 code +0.0477 | S=0.051 | ETA 227s
+[ablate] 6/48 L0.B5: story +0.0439 math +0.0253 code +0.0736 | S=0.080 | ETA 217s
+[ablate] 7/48 L0.B6: story +0.0388 math +0.0153 code +0.0510 | S=0.090 | ETA 209s
+[ablate] 8/48 L0.B7: story +0.0426 math +0.0336 code +0.0582 | S=0.023 | ETA 201s
+[ablate] 9/48 L1.B0: story +0.0047 math +0.0039 code +0.0070 | S=0.028 | ETA 194s
+[ablate] 10/48 L1.B1: story +0.0057 math +0.0042 code +0.0062 | S=0.012 | ETA 187s
+[ablate] 11/48 L1.B2: story +0.0050 math +0.0022 code +0.0047 | S=0.050 | ETA 180s
+[ablate] 12/48 L1.B3: story +0.0042 math +0.0044 code +0.0047 | S=0.001 | ETA 173s
+[ablate] 13/48 L1.B4: story +0.0054 math +0.0028 code +0.0052 | S=0.033 | ETA 167s
+[ablate] 14/48 L1.B5: story +0.0049 math +0.0026 code +0.0066 | S=0.059 | ETA 161s
+[ablate] 15/48 L1.B6: story +0.0045 math +0.0024 code +0.0074 | S=0.084 | ETA 155s
+[ablate] 16/48 L1.B7: story +0.0046 math +0.0014 code +0.0063 | S=0.131 | ETA 149s
+[ablate] 17/48 L2.B0: story +0.0068 math +0.0045 code +0.0052 | S=0.014 | ETA 144s
+[ablate] 18/48 L2.B1: story +0.0069 math +0.0086 code +0.0050 | S=0.021 | ETA 139s
+[ablate] 19/48 L2.B2: story +0.0058 math +0.0068 code +0.0077 | S=0.006 | ETA 133s
+[ablate] 20/48 L2.B3: story +0.0070 math +0.0112 code +0.0078 | S=0.020 | ETA 128s
+[ablate] 21/48 L2.B4: story +0.0058 math +0.0067 code +0.0080 | S=0.007 | ETA 123s
+[ablate] 22/48 L2.B5: story +0.0058 math +0.0066 code +0.0060 | S=0.001 | ETA 118s
+[ablate] 23/48 L2.B6: story +0.0057 math +0.0104 code +0.0054 | S=0.044 | ETA 114s
+[ablate] 24/48 L2.B7: story +0.0068 math +0.0072 code +0.0058 | S=0.004 | ETA 109s
+[ablate] 25/48 L3.B0: story +0.0091 math +0.0078 code +0.0058 | S=0.015 | ETA 104s
+[ablate] 26/48 L3.B1: story +0.0084 math +0.0076 code +0.0054 | S=0.016 | ETA 99s
+[ablate] 27/48 L3.B2: story +0.0098 math +0.0084 code +0.0062 | S=0.015 | ETA 95s
+[ablate] 28/48 L3.B3: story +0.0088 math +0.0086 code +0.0055 | S=0.018 | ETA 90s
+[ablate] 29/48 L3.B4: story +0.0105 math +0.0086 code +0.0061 | S=0.022 | ETA 86s
+[ablate] 30/48 L3.B5: story +0.0084 math +0.0067 code +0.0071 | S=0.004 | ETA 81s
+[ablate] 31/48 L3.B6: story +0.0078 math +0.0075 code +0.0058 | S=0.007 | ETA 76s
+[ablate] 32/48 L3.B7: story +0.0088 math +0.0133 code +0.0043 | S=0.083 | ETA 72s
+[ablate] 33/48 L4.B0: story +0.0101 math +0.0061 code +0.0103 | S=0.023 | ETA 67s
+[ablate] 34/48 L4.B1: story +0.0096 math +0.0061 code +0.0046 | S=0.044 | ETA 63s
+[ablate] 35/48 L4.B2: story +0.0096 math +0.0051 code +0.0110 | S=0.042 | ETA 58s
+[ablate] 36/48 L4.B3: story +0.0100 math +0.0051 code +0.0051 | S=0.051 | ETA 54s
+[ablate] 37/48 L4.B4: story +0.0096 math +0.0060 code +0.0052 | S=0.032 | ETA 49s
+[ablate] 38/48 L4.B5: story +0.0099 math +0.0054 code +0.0063 | S=0.032 | ETA 45s
+[ablate] 39/48 L4.B6: story +0.0102 math +0.0039 code +0.0098 | S=0.067 | ETA 40s
+[ablate] 40/48 L4.B7: story +0.0090 math +0.0063 code +0.0056 | S=0.019 | ETA 36s
+[ablate] 41/48 L5.B0: story +0.0118 math +0.0039 code +0.0074 | S=0.084 | ETA 31s
+[ablate] 42/48 L5.B1: story +0.0127 math +0.0033 code +0.0099 | S=0.109 | ETA 27s
+[ablate] 43/48 L5.B2: story +0.0104 math +0.0025 code +0.0079 | S=0.119 | ETA 22s
+[ablate] 44/48 L5.B3: story +0.0082 math +0.0043 code +0.0093 | S=0.044 | ETA 18s
+[ablate] 45/48 L5.B4: story +0.0187 math +0.0031 code +0.0088 | S=0.187 | ETA 13s
+[ablate] 46/48 L5.B5: story +0.0117 math +0.0030 code +0.0064 | S=0.122 | ETA 9s
+[ablate] 47/48 L5.B6: story +0.0129 math +0.0039 code +0.0127 | S=0.097 | ETA 4s
+[ablate] 48/48 L5.B7: story +0.0149 math +0.0026 code +0.0107 | S=0.159 | ETA 0s
+[ablate] checkpoint iter: 5000
+[ablate] eval: 20 batches x 32 x 256 tokens per domain per condition
+[ablate] unablated val loss: story=2.1149, math=1.4645, code=2.4911
+[ablate] mean specialization S over 48/48 blocks with positive damage: 0.0510
+[ablate] most specialised blocks: 5.4 (S=0.187, worst=story), 5.7 (S=0.159, worst=story), 1.7 (S=0.131, worst=code), 5.5 (S=0.122, worst=story), 5.2 (S=0.119, worst=story)
+[ablate] time: 213s
+[ablate] wrote ablation.csv, ablation_heatmap.png, ablation_summary.txt, block_norms.csv to /tmp/repo/out
+
+All 5 stages finished in 1455s. Outputs:
+total 352340
+drwxr-xr-x  2 root root      4096 Oct  8 19:18 .
+drwxr-xr-x 10 root root      4096 Oct  8 18:54 ..
+-rw-r--r--  1 root root      3164 Oct  8 19:18 ablation.csv
+-rw-r--r--  1 root root    165150 Oct  8 19:18 ablation_heatmap.png
+-rw-r--r--  1 root root       384 Oct  8 19:18 ablation_summary.txt
+-rw-r--r--  1 root root      1436 Oct  8 19:18 block_norms.csv
+-rw-r--r--  1 root root 360493063 Oct  8 19:14 ckpt.pt
+-rw-r--r--  1 root root     95218 Oct  8 19:14 loss_curves.png
+-rw-r--r--  1 root root      1191 Oct  8 19:14 metrics.csv
+-rw-r--r--  1 root root      3022 Oct  8 19:14 samples.txt

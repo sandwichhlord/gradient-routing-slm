@@ -1,0 +1,37 @@
+# Literature
+
+Notes written from the papers' abstracts and well-known results, plus a web check of the Gradient Routing paper's method and its TinyStories experiment. Check exact numbers and section references against the originals before citing them.
+
+## Gradient Routing (Cloud et al., 2024)
+
+*Gradient Routing: Masking Gradients to Localize Computation in Neural Networks* (arXiv 2410.04332) changes backpropagation, not the architecture. Each data point gets a data-dependent, weighted mask over the gradient, set by the user, that decides which parameters, activations or subnetworks it may update. Because the forward pass is untouched, the capability learned from that data ends up concentrated in the chosen region. The authors use this for three things: partitioning learned representations in an interpretable way (for example, splitting an autoencoder's latent space); localizing a capability so it can be removed later by ablating a pre-specified region, including a TinyStories language-model setup where data from a target story distribution is routed through a small set of extra MLP dimensions that are ablated at inference; and localizing modules in a reinforcement learner. They also report that routing still works when masks are applied to only a limited, ad-hoc subset of the data, so labels need not be complete. The routing decision is always made from labels or rules the user supplies. The model never chooses where something is stored.
+
+**Relevance to our project.** This is the method we build on, with the mask applied to MLP-block gradients. Our difference is the source of the mask: Cloud et al. take it from data labels (known domain, known forget set), while we derive it from the model's own activation energy. Their label-routed unlearning is the natural upper-bound baseline for us (the "hard label-routing baseline" in `plan.md`).
+
+## Switch Transformer (Fedus, Zoph and Shazeer, 2021)
+
+*Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity* (JMLR 2022, arXiv 2101.03961) simplifies mixture-of-experts routing to a single expert per token (top-1), which cuts router computation and communication. Training a sparse router has two known failure modes, and the paper addresses both. One is expert collapse, where the router sends most tokens to a few experts. The fix is an auxiliary load-balancing loss, alpha * N * sum_i f_i * P_i, where f_i is the fraction of tokens dispatched to expert i and P_i is the mean router probability for it. The paper uses alpha = 0.01. The loss is minimized when both are uniform. The other is training instability, handled with measures such as a fp32 router, smaller initialisation and a capacity factor that limits how many tokens each expert accepts. The paper shows large pre-training speedups at equal compute from adding experts.
+
+**Relevance to our project.** Our load-balancing term, lambda * sum f_b * (activation share) with lambda = 0.01, is modelled on this loss: the dispatch fraction f comes from an EMA, and the router probability is replaced by the block's share of activation energy. Their expert-collapse finding is the same failure we measured: with the aux gradient masked, 12 of 16 blocks died in a 300-iteration smoke run. Unlike Switch, our "router" changes only the backward pass, so the forward computation stays dense.
+
+## Elastic Weight Consolidation (Kirkpatrick et al., 2017)
+
+*Overcoming Catastrophic Forgetting in Neural Networks* (PNAS 114(13), arXiv 1612.00796) addresses sequential learning. After task A, EWC estimates how important each parameter was, using the diagonal of the Fisher information matrix F, and then trains on task B with a quadratic penalty, L(theta) = L_B(theta) + sum_i (lambda/2) F_i (theta_i - theta*_{A,i})^2. Parameters that mattered for A are held near their old values, and unimportant ones are free to move. Importance is measured per parameter, after the fact, and enforced softly through the loss. The paper demonstrates it on permuted MNIST and Atari games, and it is the standard regularization-based baseline for continual learning.
+
+**Relevance to our project.** EWC is the obvious comparison for our continual-learning experiments, since both protect parameters that earlier data needed. EWC does it with a penalty after training on the old task, using a Fisher importance score. We do it with a hard or soft gradient mask during training, using activation energy. A fair comparison would use the same sequence of domains and the same per-domain forgetting metric. A Fisher-based block score could also replace activation energy in our router, as an ablation.
+
+## Mixtral of Experts (Jiang et al., 2024)
+
+*Mixtral of Experts* (arXiv 2401.04088) describes a sparse mixture-of-experts language model with the Mistral 7B layout, where each layer's feed-forward block is replaced by 8 expert MLPs and a router that picks the top 2 for every token. With 2 of 8 experts active, it has about 47B total parameters but uses about 13B per token, and it has a 32k-token context. It matches or beats Llama 2 70B and GPT-3.5 on the benchmarks reported in the paper, at much lower inference cost. The paper's routing analysis is the part that matters here: expert assignment does not follow topic or domain (math, code, biology and so on). It correlates more with syntax and position, such as consecutive tokens often going to the same expert.
+
+**Relevance to our project.** Our setup (8 blocks per layer, top-2) mirrors Mixtral's routing shape, but our blocks are slices of one dense MLP and not separate experts, and the routing only affects training. Mixtral's finding that experts did not specialise by domain, even though the router was trained end to end, is our central question: does activation-based gradient routing produce domain specialisation where an ordinary learned router did not? It also motivates the domain probes, since specialisation might show up in what blocks encode before it shows up in ablation damage.
+
+## TinyStories (Eldan and Li, 2023)
+
+*TinyStories: How Small Can Language Models Be and Still Speak Coherent English?* (arXiv 2305.07759) releases a synthetic corpus of short stories written by GPT-3.5 and GPT-4, restricted to a vocabulary a 3-4-year-old would know. Models with only a few million parameters, even a single transformer layer, trained on it produce fluent, consistent stories and show some reasoning ability. These abilities usually need much larger models on web text. The paper also proposes evaluating with a GPT-4 grader, scoring grammar, creativity and consistency, instead of relying on perplexity alone. The dataset is on HuggingFace as `roneneldan/TinyStories` and is a standard small-scale testbed for language-model training and interpretability work.
+
+**Relevance to our project.** TinyStories is our story domain (20M tokens streamed), chosen because a model of about 10M non-embedding parameters trains on it to meaningful quality in minutes on a T4. It is also the dataset Gradient Routing used for its language-model experiment, which keeps our results comparable. Its limits matter: it is narrow, synthetic and uniform in style, so the story domain is easy next to the math and code domains.
+
+## Research gap
+
+Gradient routing needs human-supplied labels to decide where capabilities go; learned MoE routers use no labels but showed little domain specialisation. We test whether routing gradients by the model's own activation energy yields label-free, domain-specialised, ablatable blocks.
