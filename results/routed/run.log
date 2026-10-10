@@ -1,0 +1,343 @@
+>>> ROUTED mode: gradient routing on, outputs in out_routed/
+
+=================== [1/5] prepare data  (t=0s) ===================
+[prepare] collecting story: 20,500,000 tokens
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+  [story] 2.0M / 20.5M tokens (11s)
+  [story] 4.1M / 20.5M tokens (12s)
+  [story] 6.1M / 20.5M tokens (14s)
+  [story] 8.1M / 20.5M tokens (15s)
+  [story] 10.1M / 20.5M tokens (17s)
+  [story] 12.2M / 20.5M tokens (18s)
+  [story] 14.2M / 20.5M tokens (20s)
+  [story] 16.2M / 20.5M tokens (21s)
+  [story] 18.3M / 20.5M tokens (22s)
+  [story] 20.3M / 20.5M tokens (23s)
+[prepare] story: 91200 train docs, 2240 val docs (23s)
+[prepare] collecting math: 10,500,000 tokens
+  [math] 2.0M / 10.5M tokens (2s)
+  [math] 4.0M / 10.5M tokens (4s)
+  [math] 6.0M / 10.5M tokens (6s)
+  [math] 8.0M / 10.5M tokens (7s)
+  [math] 10.0M / 10.5M tokens (9s)
+[prepare] math: 46085 train docs, 2299 val docs (10s)
+[prepare] collecting code: 10,500,000 tokens
+Repo card metadata block was not found. Setting CardData to empty.
+  [code] 2.2M / 10.5M tokens (3s)
+  [code] 4.5M / 10.5M tokens (5s)
+  [code] 6.7M / 10.5M tokens (6s)
+  [code] 8.8M / 10.5M tokens (8s)
+  [code] 11.1M / 10.5M tokens (10s)
+[prepare] code: 4902 train docs, 218 val docs (10s)
+[prepare] done (real): {"mode": "real", "vocab_size": 50257, "eot": 50256, "domains": ["story", "math", "code"], "train_tokens": 40623542, "train_tokens_per_domain": {"story": 20005009, "math": 10030871, "code": 10587662}, "val_story_tokens": 500021, "val_math_tokens": 500101, "val_code_tokens": 500263}
+
+=================== [2/5] train  (t=47s) ===================
+[train] GPU: Tesla T4
+[train] train tokens: 40,623,542 | val_story: 500,021 | val_math: 500,101 | val_code: 500,263
+[train] gradient routing ON: top-2 of 8 blocks per layer, eps=0.0, lambda=0.01, ema=0.99, mask_aux=False
+[train] device=cuda amp=fp16 params=29.94M (non-embedding 10.62M)
+[eval] iter 0: train 10.8264 | story 10.8950 | math 10.9027 | code 10.5724
+[train] iter 50/5000 loss 7.4141 lr 1.49e-04 400ms/it | elapsed 0m20s | ETA 33m02s
+[train] iter 100/5000 loss 4.7260 lr 2.99e-04 193ms/it | elapsed 0m29s | ETA 24m14s
+[train] iter 150/5000 loss 4.3274 lr 4.48e-04 194ms/it | elapsed 0m39s | ETA 21m13s
+[train] iter 200/5000 loss 4.0991 lr 5.97e-04 197ms/it | elapsed 0m49s | ETA 19m42s
+[train] iter 250/5000 loss 3.6888 lr 6.00e-04 199ms/it | elapsed 0m59s | ETA 18m44s
+[eval] iter 250: train 5.3906 | story 4.0829 | math 2.1600 | code 4.1535
+[route] iter 250: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.064 max 0.836 (uniform 0.250) | dead blocks: 0
+[train] iter 300/5000 loss 3.6717 lr 5.99e-04 406ms/it | elapsed 1m19s | ETA 20m45s
+[train] iter 350/5000 loss 3.5539 lr 5.99e-04 209ms/it | elapsed 1m29s | ETA 19m55s
+[train] iter 400/5000 loss 3.3207 lr 5.98e-04 213ms/it | elapsed 1m40s | ETA 19m16s
+[train] iter 450/5000 loss 3.6030 lr 5.96e-04 212ms/it | elapsed 1m51s | ETA 18m44s
+[train] iter 500/5000 loss 3.4065 lr 5.95e-04 210ms/it | elapsed 2m01s | ETA 18m15s
+[eval] iter 500: train 3.3967 | story 3.4918 | math 1.9199 | code 3.7356
+[route] iter 500: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.072 max 0.772 (uniform 0.250) | dead blocks: 0
+[train] iter 550/5000 loss 3.1362 lr 5.93e-04 412ms/it | elapsed 2m22s | ETA 19m11s
+[train] iter 600/5000 loss 3.0617 lr 5.91e-04 204ms/it | elapsed 2m32s | ETA 18m37s
+[train] iter 650/5000 loss 3.1438 lr 5.88e-04 203ms/it | elapsed 2m42s | ETA 18m08s
+[train] iter 700/5000 loss 2.8635 lr 5.86e-04 205ms/it | elapsed 2m52s | ETA 17m41s
+[train] iter 750/5000 loss 2.8556 lr 5.83e-04 207ms/it | elapsed 3m03s | ETA 17m18s
+[eval] iter 750: train 3.0717 | story 3.2157 | math 1.8348 | code 3.5290
+[route] iter 750: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.077 max 0.777 (uniform 0.250) | dead blocks: 0
+[train] iter 800/5000 loss 2.7632 lr 5.80e-04 417ms/it | elapsed 3m24s | ETA 17m51s
+[train] iter 850/5000 loss 2.8652 lr 5.76e-04 207ms/it | elapsed 3m34s | ETA 17m26s
+[train] iter 900/5000 loss 2.9142 lr 5.72e-04 207ms/it | elapsed 3m44s | ETA 17m03s
+[train] iter 950/5000 loss 2.7630 lr 5.68e-04 206ms/it | elapsed 3m55s | ETA 16m41s
+[train] iter 1000/5000 loss 2.5789 lr 5.64e-04 205ms/it | elapsed 4m05s | ETA 16m21s
+[eval] iter 1000: train 2.8827 | story 3.0323 | math 1.7793 | code 3.4259
+[route] iter 1000: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.098 max 0.784 (uniform 0.250) | dead blocks: 0
+[train] saved checkpoint @ iter 1000 -> out_routed/ckpt.pt
+[train] iter 1050/5000 loss 2.6676 lr 5.59e-04 421ms/it | elapsed 4m26s | ETA 16m41s
+[train] iter 1100/5000 loss 2.8199 lr 5.55e-04 206ms/it | elapsed 4m36s | ETA 16m20s
+[train] iter 1150/5000 loss 2.7368 lr 5.50e-04 206ms/it | elapsed 4m46s | ETA 16m00s
+[train] iter 1200/5000 loss 2.5394 lr 5.44e-04 207ms/it | elapsed 4m57s | ETA 15m41s
+[train] iter 1250/5000 loss 2.9425 lr 5.39e-04 207ms/it | elapsed 5m07s | ETA 15m22s
+[eval] iter 1250: train 2.7930 | story 2.8894 | math 1.7566 | code 3.2917
+[route] iter 1250: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.114 max 0.812 (uniform 0.250) | dead blocks: 0
+[train] iter 1300/5000 loss 2.5544 lr 5.33e-04 415ms/it | elapsed 5m28s | ETA 15m34s
+[train] iter 1350/5000 loss 2.5930 lr 5.27e-04 207ms/it | elapsed 5m38s | ETA 15m15s
+[train] iter 1400/5000 loss 2.6535 lr 5.21e-04 206ms/it | elapsed 5m49s | ETA 14m57s
+[train] iter 1450/5000 loss 2.7920 lr 5.15e-04 206ms/it | elapsed 5m59s | ETA 14m39s
+[train] iter 1500/5000 loss 2.6904 lr 5.08e-04 206ms/it | elapsed 6m09s | ETA 14m22s
+[eval] iter 1500: train 2.6764 | story 2.8001 | math 1.7183 | code 3.2059
+[route] iter 1500: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.111 max 0.833 (uniform 0.250) | dead blocks: 0
+[train] iter 1550/5000 loss 2.7220 lr 5.01e-04 414ms/it | elapsed 6m30s | ETA 14m28s
+[train] iter 1600/5000 loss 2.4968 lr 4.95e-04 205ms/it | elapsed 6m40s | ETA 14m11s
+[train] iter 1650/5000 loss 2.5494 lr 4.87e-04 206ms/it | elapsed 6m50s | ETA 13m54s
+[train] iter 1700/5000 loss 2.4535 lr 4.80e-04 206ms/it | elapsed 7m01s | ETA 13m37s
+[train] iter 1750/5000 loss 2.4424 lr 4.73e-04 206ms/it | elapsed 7m11s | ETA 13m21s
+[eval] iter 1750: train 2.6054 | story 2.7138 | math 1.6876 | code 3.1525
+[route] iter 1750: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.113 max 0.836 (uniform 0.250) | dead blocks: 0
+[train] iter 1800/5000 loss 2.5456 lr 4.65e-04 414ms/it | elapsed 7m32s | ETA 13m23s
+[train] iter 1850/5000 loss 2.5466 lr 4.57e-04 206ms/it | elapsed 7m42s | ETA 13m07s
+[train] iter 1900/5000 loss 2.6304 lr 4.50e-04 207ms/it | elapsed 7m52s | ETA 12m51s
+[train] iter 1950/5000 loss 2.4674 lr 4.42e-04 207ms/it | elapsed 8m03s | ETA 12m35s
+[train] iter 2000/5000 loss 2.5313 lr 4.33e-04 206ms/it | elapsed 8m13s | ETA 12m20s
+[eval] iter 2000: train 2.5355 | story 2.6398 | math 1.6634 | code 3.0865
+[route] iter 2000: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.116 max 0.829 (uniform 0.250) | dead blocks: 0
+[train] saved checkpoint @ iter 2000 -> out_routed/ckpt.pt
+[train] iter 2050/5000 loss 2.6086 lr 4.25e-04 425ms/it | elapsed 8m34s | ETA 12m20s
+[train] iter 2100/5000 loss 2.4690 lr 4.17e-04 207ms/it | elapsed 8m45s | ETA 12m05s
+[train] iter 2150/5000 loss 2.5832 lr 4.09e-04 207ms/it | elapsed 8m55s | ETA 11m49s
+[train] iter 2200/5000 loss 2.4198 lr 4.00e-04 207ms/it | elapsed 9m05s | ETA 11m34s
+[train] iter 2250/5000 loss 2.2044 lr 3.91e-04 206ms/it | elapsed 9m16s | ETA 11m19s
+[eval] iter 2250: train 2.4910 | story 2.5816 | math 1.6366 | code 3.0393
+[route] iter 2250: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.116 max 0.832 (uniform 0.250) | dead blocks: 0
+[train] iter 2300/5000 loss 2.1500 lr 3.83e-04 415ms/it | elapsed 9m36s | ETA 11m17s
+[train] iter 2350/5000 loss 2.4327 lr 3.74e-04 207ms/it | elapsed 9m47s | ETA 11m02s
+[train] iter 2400/5000 loss 2.3007 lr 3.65e-04 207ms/it | elapsed 9m57s | ETA 10m47s
+[train] iter 2450/5000 loss 2.4761 lr 3.57e-04 206ms/it | elapsed 10m07s | ETA 10m32s
+[train] iter 2500/5000 loss 2.4353 lr 3.48e-04 206ms/it | elapsed 10m18s | ETA 10m18s
+[eval] iter 2500: train 2.4452 | story 2.5397 | math 1.6147 | code 2.9817
+[route] iter 2500: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.125 max 0.829 (uniform 0.250) | dead blocks: 0
+[train] iter 2550/5000 loss 2.2234 lr 3.39e-04 415ms/it | elapsed 10m38s | ETA 10m13s
+[train] iter 2600/5000 loss 2.3718 lr 3.30e-04 206ms/it | elapsed 10m49s | ETA 9m59s
+[train] iter 2650/5000 loss 2.4143 lr 3.21e-04 207ms/it | elapsed 10m59s | ETA 9m44s
+[train] iter 2700/5000 loss 2.3017 lr 3.13e-04 207ms/it | elapsed 11m09s | ETA 9m30s
+[train] iter 2750/5000 loss 2.3021 lr 3.04e-04 207ms/it | elapsed 11m20s | ETA 9m16s
+[eval] iter 2750: train 2.3879 | story 2.4879 | math 1.5933 | code 2.9335
+[route] iter 2750: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.124 max 0.827 (uniform 0.250) | dead blocks: 0
+[train] iter 2800/5000 loss 2.3454 lr 2.95e-04 414ms/it | elapsed 11m40s | ETA 9m10s
+[train] iter 2850/5000 loss 2.4922 lr 2.86e-04 207ms/it | elapsed 11m51s | ETA 8m56s
+[train] iter 2900/5000 loss 2.1292 lr 2.77e-04 207ms/it | elapsed 12m01s | ETA 8m42s
+[train] iter 2950/5000 loss 2.4000 lr 2.69e-04 207ms/it | elapsed 12m11s | ETA 8m28s
+[train] iter 3000/5000 loss 2.5116 lr 2.60e-04 206ms/it | elapsed 12m22s | ETA 8m14s
+[eval] iter 3000: train 2.3544 | story 2.4442 | math 1.5747 | code 2.8779
+[route] iter 3000: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.132 max 0.822 (uniform 0.250) | dead blocks: 0
+[train] saved checkpoint @ iter 3000 -> out_routed/ckpt.pt
+[train] iter 3050/5000 loss 2.6047 lr 2.52e-04 425ms/it | elapsed 12m43s | ETA 8m08s
+[train] iter 3100/5000 loss 2.2442 lr 2.43e-04 205ms/it | elapsed 12m53s | ETA 7m54s
+[train] iter 3150/5000 loss 2.2577 lr 2.35e-04 207ms/it | elapsed 13m04s | ETA 7m40s
+[train] iter 3200/5000 loss 2.3741 lr 2.27e-04 207ms/it | elapsed 13m14s | ETA 7m26s
+[train] iter 3250/5000 loss 2.4787 lr 2.19e-04 207ms/it | elapsed 13m24s | ETA 7m13s
+[eval] iter 3250: train 2.3324 | story 2.4061 | math 1.5645 | code 2.8340
+[route] iter 3250: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.131 max 0.817 (uniform 0.250) | dead blocks: 0
+[train] iter 3300/5000 loss 2.1648 lr 2.11e-04 415ms/it | elapsed 13m45s | ETA 7m05s
+[train] iter 3350/5000 loss 2.3948 lr 2.03e-04 206ms/it | elapsed 13m55s | ETA 6m51s
+[train] iter 3400/5000 loss 2.3244 lr 1.95e-04 207ms/it | elapsed 14m06s | ETA 6m38s
+[train] iter 3450/5000 loss 2.3486 lr 1.88e-04 207ms/it | elapsed 14m16s | ETA 6m24s
+[train] iter 3500/5000 loss 2.2434 lr 1.80e-04 208ms/it | elapsed 14m26s | ETA 6m11s
+[eval] iter 3500: train 2.2982 | story 2.3730 | math 1.5543 | code 2.7911
+[route] iter 3500: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.138 max 0.812 (uniform 0.250) | dead blocks: 0
+[train] iter 3550/5000 loss 2.1848 lr 1.73e-04 416ms/it | elapsed 14m47s | ETA 6m02s
+[train] iter 3600/5000 loss 2.1921 lr 1.66e-04 207ms/it | elapsed 14m58s | ETA 5m49s
+[train] iter 3650/5000 loss 2.4038 lr 1.59e-04 207ms/it | elapsed 15m08s | ETA 5m35s
+[train] iter 3700/5000 loss 2.3199 lr 1.52e-04 207ms/it | elapsed 15m18s | ETA 5m22s
+[train] iter 3750/5000 loss 2.2488 lr 1.46e-04 207ms/it | elapsed 15m29s | ETA 5m09s
+[eval] iter 3750: train 2.2595 | story 2.3459 | math 1.5442 | code 2.7575
+[route] iter 3750: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.142 max 0.790 (uniform 0.250) | dead blocks: 0
+[train] iter 3800/5000 loss 2.2206 lr 1.39e-04 415ms/it | elapsed 15m49s | ETA 4m59s
+[train] iter 3850/5000 loss 2.4461 lr 1.33e-04 207ms/it | elapsed 16m00s | ETA 4m46s
+[train] iter 3900/5000 loss 2.3240 lr 1.27e-04 207ms/it | elapsed 16m10s | ETA 4m33s
+[train] iter 3950/5000 loss 2.0944 lr 1.21e-04 206ms/it | elapsed 16m20s | ETA 4m20s
+[train] iter 4000/5000 loss 2.0226 lr 1.16e-04 207ms/it | elapsed 16m31s | ETA 4m07s
+[eval] iter 4000: train 2.2338 | story 2.3242 | math 1.5354 | code 2.7297
+[route] iter 4000: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.146 max 0.773 (uniform 0.250) | dead blocks: 0
+[train] saved checkpoint @ iter 4000 -> out_routed/ckpt.pt
+[train] iter 4050/5000 loss 2.0396 lr 1.11e-04 426ms/it | elapsed 16m52s | ETA 3m57s
+[train] iter 4100/5000 loss 2.3735 lr 1.06e-04 207ms/it | elapsed 17m02s | ETA 3m44s
+[train] iter 4150/5000 loss 2.3128 lr 1.01e-04 207ms/it | elapsed 17m13s | ETA 3m31s
+[train] iter 4200/5000 loss 2.3099 lr 9.63e-05 207ms/it | elapsed 17m23s | ETA 3m18s
+[train] iter 4250/5000 loss 2.1738 lr 9.20e-05 207ms/it | elapsed 17m33s | ETA 3m05s
+[eval] iter 4250: train 2.2234 | story 2.3057 | math 1.5260 | code 2.7035
+[route] iter 4250: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.149 max 0.757 (uniform 0.250) | dead blocks: 0
+[train] iter 4300/5000 loss 2.4197 lr 8.79e-05 416ms/it | elapsed 17m54s | ETA 2m54s
+[train] iter 4350/5000 loss 2.2872 lr 8.41e-05 207ms/it | elapsed 18m05s | ETA 2m42s
+[train] iter 4400/5000 loss 2.3384 lr 8.06e-05 207ms/it | elapsed 18m15s | ETA 2m29s
+[train] iter 4450/5000 loss 2.3027 lr 7.74e-05 207ms/it | elapsed 18m25s | ETA 2m16s
+[train] iter 4500/5000 loss 2.0380 lr 7.44e-05 208ms/it | elapsed 18m36s | ETA 2m04s
+[eval] iter 4500: train 2.2097 | story 2.2888 | math 1.5195 | code 2.6814
+[route] iter 4500: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.148 max 0.737 (uniform 0.250) | dead blocks: 0
+[train] iter 4550/5000 loss 2.1773 lr 7.17e-05 416ms/it | elapsed 18m56s | ETA 1m52s
+[train] iter 4600/5000 loss 2.5430 lr 6.92e-05 208ms/it | elapsed 19m07s | ETA 1m39s
+[train] iter 4650/5000 loss 2.3494 lr 6.71e-05 207ms/it | elapsed 19m17s | ETA 1m27s
+[train] iter 4700/5000 loss 2.1316 lr 6.52e-05 207ms/it | elapsed 19m28s | ETA 1m14s
+[train] iter 4750/5000 loss 2.0922 lr 6.36e-05 207ms/it | elapsed 19m38s | ETA 1m02s
+[eval] iter 4750: train 2.1994 | story 2.2794 | math 1.5132 | code 2.6674
+[route] iter 4750: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.147 max 0.717 (uniform 0.250) | dead blocks: 0
+[train] iter 4800/5000 loss 2.1866 lr 6.23e-05 415ms/it | elapsed 19m59s | ETA 0m49s
+[train] iter 4850/5000 loss 2.2705 lr 6.13e-05 206ms/it | elapsed 20m09s | ETA 0m37s
+[train] iter 4900/5000 loss 2.1700 lr 6.06e-05 206ms/it | elapsed 20m19s | ETA 0m24s
+[train] iter 4950/5000 loss 2.1362 lr 6.02e-05 206ms/it | elapsed 20m30s | ETA 0m12s
+[train] iter 5000/5000 loss 2.3340 lr 6.00e-05 206ms/it | elapsed 20m40s | ETA 0m00s
+[eval] iter 5000: train 2.1746 | story 2.2703 | math 1.5099 | code 2.6590
+[route] iter 5000: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.147 max 0.697 (uniform 0.250) | dead blocks: 0
+[train] saved checkpoint @ iter 5000 -> out_routed/ckpt.pt
+[route] final: routing: k=2/8 eps=0.0 mask_aux=False | selection frac min 0.147 max 0.697 (uniform 0.250) | dead blocks: 0
+[train] finished in 20m51s
+
+=================== [3/5] sample  (t=1308s) ===================
+# samples from checkpoint @ iter 5000 (temperature=0.8, top_k=200, max_new_tokens=120)
+
+=== prompt: 'Once upon a time' | sample 1 ===
+Once upon a time there was a little girl named Lily. She loved to play in the park with her dad. One day, Lily's mommy said they had to go to the park and see a big tree. Lily thought the tree was nice and wanted to play with it. But then, her mommy came out and said it was too hot. Lily didn't want to hurt her. Her mommy said they could do it. Lily didn't want to hurt her.
+
+But her mommy said she wasn't too cold. She thought for a moment and asked her dad if they could play in
+
+=== prompt: 'Once upon a time' | sample 2 ===
+Once upon a time there there was a yellow boat. The boat was very strong and could swim in the sea. The boat had a big boat and it had a long neck. The boat was different.
+
+One day, the boat decided to swim in the sea. As they travelled, they swam through the water. As they swam, they saw a big, green lake. The boat looked sad.
+
+The boat tried to open the path, but it was too late. The boat was stuck in the water. The boat was very sad.
+
+The boat sailed back to the boat,
+
+=== prompt: 'Once upon a time' | sample 3 ===
+Once upon a time there lived a tidy little girl named Lucy. Lucy loved to play outside in the sunshine. 
+
+One morning she went to a tree to pick a big tree. She wanted to look for it. Lucy asked her dad, "Can you go to the tree?"
+
+Her dad said, "Of course, Lucy. Let's get beak and take care of it."
+
+Lucy was very careful and kept a little bit of the tree. But after some time, Lucy was able to pick the tree. She was so proud of herself for her help. 
+
+From
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 1 ===
+Q: 37 + 48 = A: 88
+Q: 667 - 1 = A: 657
+Q: 691 - 33 = A: 695
+Q: 9 + 845 = A: 845
+Q: 1 + 851 = A: 856
+Q: 642 - 1 = A: 649
+Q: 1 + 0 = A: 1
+Q: 0 + 0 = A: 0
+Q: 15 x 58 = A: 730
+Q: 0 - 9 = A: -9
+Q: 7 x 7 = A: 49
+Q: 6 + 477
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 2 ===
+Q: 37 + 48 = A: 95
+Q: 12 + 684 = A: 691
+Q: 22 + 6 = A: 28
+Q: 0 x 97 = A: 0
+Q: 1 x 5 = A: 5
+Q: 6 - 6 = A: 0
+Q: 658 x 913 = A: 513992
+Q: 876 - 6 = A: 858
+Q: 95 + 795 = A: 892
+Q: 924 x 1 = A: 917
+Q: 912 + 20 = A: 931
+Q: 53 -
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 3 ===
+Q: 37 + 48 = A: 128
+Q: 26 - 5 = A: 21
+Q: 521 x 6 = A: 3776
+Q: 4 + 9 = A: 13
+Q: 8 - 4 = A: 4
+Q: 1 + 7 = A: 8
+Q: 42 + 3 = A: 46
+Q: 9 x 143 = A: 1573
+Q: 592 - 95 = A: 513
+Q: 2 x 1 = A: 2
+
+=== prompt: 'def add(a, b):' | sample 1 ===
+def add(a, b):
+                                                                                                                       
+
+=== prompt: 'def add(a, b):' | sample 2 ===
+def add(a, b):
+                                                                                                                      # A
+
+=== prompt: 'def add(a, b):' | sample 3 ===
+def add(a, b): #                                                                                                                       
+
+[sample] wrote out_routed/samples.txt
+
+=================== [4/5] plots  (t=1314s) ===================
+[plots] wrote out_routed/loss_curves.png
+
+=================== [5/5] ablate  (t=1317s) ===================
+[ablate] mask check passed: ablating L0.B0 changes logits by up to 6.0898; all-ones mask and clear_ablation() reproduce the dense model
+[ablate] unablated: story 2.2644 | math 1.5078 | code 2.6524
+[ablate] 1/48 L0.B0: story +0.1846 math +0.1734 code +0.4770 | S=0.108 | ETA 399s
+[ablate] 2/48 L0.B1: story +0.3636 math +0.3652 code +0.5633 | S=0.021 | ETA 291s
+[ablate] 3/48 L0.B2: story +0.4738 math +0.4398 code +0.4449 | S=0.000 | ETA 253s
+[ablate] 4/48 L0.B3: story +0.2107 math +0.4630 code +0.3910 | S=0.044 | ETA 232s
+[ablate] 5/48 L0.B4: story +0.1984 math +0.1368 code +0.2611 | S=0.030 | ETA 218s
+[ablate] 6/48 L0.B5: story +0.2515 math +0.3180 code +0.3072 | S=0.005 | ETA 208s
+[ablate] 7/48 L0.B6: story +1.3630 math +0.3851 code +0.7141 | S=0.111 | ETA 200s
+[ablate] 8/48 L0.B7: story +0.2258 math +0.9445 code +0.2533 | S=0.207 | ETA 192s
+[ablate] 9/48 L1.B0: story +0.0398 math +0.0166 code +0.0271 | S=0.053 | ETA 185s
+[ablate] 10/48 L1.B1: story +0.0387 math +0.0605 code +0.0387 | S=0.022 | ETA 179s
+[ablate] 11/48 L1.B2: story +0.0395 math +0.0660 code +0.0372 | S=0.033 | ETA 173s
+[ablate] 12/48 L1.B3: story +0.0873 math +0.0350 code +0.0620 | S=0.057 | ETA 167s
+[ablate] 13/48 L1.B4: story +0.0607 math +0.0211 code +0.0409 | S=0.074 | ETA 161s
+[ablate] 14/48 L1.B5: story +0.0577 math +0.0216 code +0.0504 | S=0.066 | ETA 155s
+[ablate] 15/48 L1.B6: story +0.0321 math +0.0379 code +0.0434 | S=0.007 | ETA 150s
+[ablate] 16/48 L1.B7: story +0.0388 math +0.0234 code +0.0389 | S=0.023 | ETA 145s
+[ablate] 17/48 L2.B0: story +0.0689 math +0.0294 code +0.0256 | S=0.096 | ETA 139s
+[ablate] 18/48 L2.B1: story +0.0300 math +0.0187 code +0.0344 | S=0.027 | ETA 134s
+[ablate] 19/48 L2.B2: story +0.0293 math +0.2354 code +0.0285 | S=0.424 | ETA 129s
+[ablate] 20/48 L2.B3: story +0.0353 math +0.0288 code +0.0561 | S=0.037 | ETA 124s
+[ablate] 21/48 L2.B4: story +0.0353 math +0.0296 code +0.0294 | S=0.003 | ETA 120s
+[ablate] 22/48 L2.B5: story +0.0368 math +0.0104 code +0.0384 | S=0.109 | ETA 115s
+[ablate] 23/48 L2.B6: story +0.0417 math +0.0219 code +0.0321 | S=0.030 | ETA 110s
+[ablate] 24/48 L2.B7: story +0.0457 math +0.1088 code +0.0388 | S=0.102 | ETA 105s
+[ablate] 25/48 L3.B0: story +0.0361 math +0.0343 code +0.0267 | S=0.008 | ETA 101s
+[ablate] 26/48 L3.B1: story +0.0333 math +0.0353 code +0.0247 | S=0.010 | ETA 96s
+[ablate] 27/48 L3.B2: story +0.1073 math +0.0488 code +0.0357 | S=0.102 | ETA 92s
+[ablate] 28/48 L3.B3: story +0.0773 math +0.0309 code +0.0250 | S=0.118 | ETA 87s
+[ablate] 29/48 L3.B4: story +0.0362 math +0.0338 code +0.0218 | S=0.020 | ETA 83s
+[ablate] 30/48 L3.B5: story +0.0348 math +0.0786 code +0.0493 | S=0.051 | ETA 78s
+[ablate] 31/48 L3.B6: story +0.0682 math +0.1753 code +0.0221 | S=0.244 | ETA 74s
+[ablate] 32/48 L3.B7: story +0.0394 math +0.0368 code +0.0300 | S=0.006 | ETA 69s
+[ablate] 33/48 L4.B0: story +0.0504 math +0.1624 code +0.0601 | S=0.131 | ETA 65s
+[ablate] 34/48 L4.B1: story +0.0791 math +0.0307 code +0.0321 | S=0.096 | ETA 61s
+[ablate] 35/48 L4.B2: story +0.0378 math +0.0432 code +0.1192 | S=0.131 | ETA 56s
+[ablate] 36/48 L4.B3: story +0.0894 math +0.2774 code +0.0390 | S=0.255 | ETA 52s
+[ablate] 37/48 L4.B4: story +0.0429 math +0.0403 code +0.0435 | S=0.000 | ETA 48s
+[ablate] 38/48 L4.B5: story +0.1296 math +0.0436 code +0.0295 | S=0.183 | ETA 43s
+[ablate] 39/48 L4.B6: story +0.0688 math +0.4437 code +0.0398 | S=0.431 | ETA 39s
+[ablate] 40/48 L4.B7: story +0.1564 math +0.0625 code +0.0437 | S=0.136 | ETA 35s
+[ablate] 41/48 L5.B0: story +0.0959 math +1.5190 code +0.0714 | S=0.644 | ETA 30s
+[ablate] 42/48 L5.B1: story +0.0753 math +0.0341 code +0.0435 | S=0.052 | ETA 26s
+[ablate] 43/48 L5.B2: story +0.0683 math +0.1754 code +0.1242 | S=0.060 | ETA 22s
+[ablate] 44/48 L5.B3: story +0.0954 math +0.0168 code +0.0765 | S=0.157 | ETA 17s
+[ablate] 45/48 L5.B4: story +0.1564 math +0.0578 code +0.1503 | S=0.071 | ETA 13s
+[ablate] 46/48 L5.B5: story +0.1491 math +0.0318 code +0.3020 | S=0.239 | ETA 9s
+[ablate] 47/48 L5.B6: story +0.0935 math +0.0545 code +0.1468 | S=0.069 | ETA 4s
+[ablate] 48/48 L5.B7: story +0.0507 math +0.4648 code +0.0772 | S=0.394 | ETA 0s
+[ablate] checkpoint iter: 5000
+[ablate] eval: 20 batches x 32 x 256 tokens per domain per condition
+[ablate] unablated val loss: story=2.2644, math=1.5078, code=2.6524
+[ablate] mean specialization S over 48/48 blocks with positive damage: 0.1104
+[ablate] most specialised blocks: 5.0 (S=0.644, worst=math), 4.6 (S=0.431, worst=math), 2.2 (S=0.424, worst=math), 5.7 (S=0.394, worst=math), 4.3 (S=0.255, worst=math)
+[ablate] time: 207s
+[ablate] wrote ablation.csv, ablation_heatmap.png, ablation_summary.txt, block_norms.csv to out_routed
+
+All 5 stages finished in 1529s. Outputs:
+total 352368
+drwxr-xr-x  2 root root      4096 Oct 10 11:39 .
+drwxr-xr-x 12 root root      4096 Oct 10 11:15 ..
+-rw-r--r--  1 root root      3164 Oct 10 11:39 ablation.csv
+-rw-r--r--  1 root root    157484 Oct 10 11:39 ablation_heatmap.png
+-rw-r--r--  1 root root       380 Oct 10 11:39 ablation_summary.txt
+-rw-r--r--  1 root root      1436 Oct 10 11:39 block_norms.csv
+-rw-r--r--  1 root root 360495105 Oct 10 11:36 ckpt.pt
+-rw-r--r--  1 root root     96454 Oct 10 11:36 loss_curves.png
+-rw-r--r--  1 root root      1192 Oct 10 11:36 metrics.csv
+-rw-r--r--  1 root root     36540 Oct 10 11:36 routing_stats.csv
+-rw-r--r--  1 root root      2951 Oct 10 11:36 samples.txt

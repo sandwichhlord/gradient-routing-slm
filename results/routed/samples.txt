@@ -1,0 +1,77 @@
+# samples from checkpoint @ iter 5000 (temperature=0.8, top_k=200, max_new_tokens=120)
+
+=== prompt: 'Once upon a time' | sample 1 ===
+Once upon a time there was a little girl named Lily. She loved to play in the park with her dad. One day, Lily's mommy said they had to go to the park and see a big tree. Lily thought the tree was nice and wanted to play with it. But then, her mommy came out and said it was too hot. Lily didn't want to hurt her. Her mommy said they could do it. Lily didn't want to hurt her.
+
+But her mommy said she wasn't too cold. She thought for a moment and asked her dad if they could play in
+
+=== prompt: 'Once upon a time' | sample 2 ===
+Once upon a time there there was a yellow boat. The boat was very strong and could swim in the sea. The boat had a big boat and it had a long neck. The boat was different.
+
+One day, the boat decided to swim in the sea. As they travelled, they swam through the water. As they swam, they saw a big, green lake. The boat looked sad.
+
+The boat tried to open the path, but it was too late. The boat was stuck in the water. The boat was very sad.
+
+The boat sailed back to the boat,
+
+=== prompt: 'Once upon a time' | sample 3 ===
+Once upon a time there lived a tidy little girl named Lucy. Lucy loved to play outside in the sunshine. 
+
+One morning she went to a tree to pick a big tree. She wanted to look for it. Lucy asked her dad, "Can you go to the tree?"
+
+Her dad said, "Of course, Lucy. Let's get beak and take care of it."
+
+Lucy was very careful and kept a little bit of the tree. But after some time, Lucy was able to pick the tree. She was so proud of herself for her help. 
+
+From
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 1 ===
+Q: 37 + 48 = A: 88
+Q: 667 - 1 = A: 657
+Q: 691 - 33 = A: 695
+Q: 9 + 845 = A: 845
+Q: 1 + 851 = A: 856
+Q: 642 - 1 = A: 649
+Q: 1 + 0 = A: 1
+Q: 0 + 0 = A: 0
+Q: 15 x 58 = A: 730
+Q: 0 - 9 = A: -9
+Q: 7 x 7 = A: 49
+Q: 6 + 477
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 2 ===
+Q: 37 + 48 = A: 95
+Q: 12 + 684 = A: 691
+Q: 22 + 6 = A: 28
+Q: 0 x 97 = A: 0
+Q: 1 x 5 = A: 5
+Q: 6 - 6 = A: 0
+Q: 658 x 913 = A: 513992
+Q: 876 - 6 = A: 858
+Q: 95 + 795 = A: 892
+Q: 924 x 1 = A: 917
+Q: 912 + 20 = A: 931
+Q: 53 -
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 3 ===
+Q: 37 + 48 = A: 128
+Q: 26 - 5 = A: 21
+Q: 521 x 6 = A: 3776
+Q: 4 + 9 = A: 13
+Q: 8 - 4 = A: 4
+Q: 1 + 7 = A: 8
+Q: 42 + 3 = A: 46
+Q: 9 x 143 = A: 1573
+Q: 592 - 95 = A: 513
+Q: 2 x 1 = A: 2
+
+=== prompt: 'def add(a, b):' | sample 1 ===
+def add(a, b):
+                                                                                                                       
+
+=== prompt: 'def add(a, b):' | sample 2 ===
+def add(a, b):
+                                                                                                                      # A
+
+=== prompt: 'def add(a, b):' | sample 3 ===
+def add(a, b): #                                                                                                                       
