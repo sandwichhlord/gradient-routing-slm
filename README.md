@@ -10,43 +10,68 @@ The MLP hidden layer in every transformer layer is split into `n_blocks` (8) equ
 |---|---|
 | Data pipeline (`data/prepare.py`) | Completed. Real data (41M tokens) built and used on a T4. |
 | Baseline training (`train.py`, `configs/baseline.py`) | Completed. 5000 iterations on a T4, results below. |
-| Routing module (`model/routing.py`) | Ongoing: implemented and unit-tested. No full-scale routed run yet. |
+| Routing module (`model/routing.py`) | Completed. Implemented, unit-tested, and trained once at full scale on a T4 (single seed). |
 | Evaluation harness (`eval/`) | Ongoing: loss curves, samples and the ablation matrix are done; domain probes are pending. |
 
 ## Results so far
 
-Dense baseline only (no routed run exists yet). Kaggle T4, fp16, 5000 iterations, 10.6M non-embedding parameters (29.9M with the tied embedding), real data. Raw files are in [`results/baseline/`](results/baseline/).
+Dense baseline and one gradient-routed run (top-2 of 8 blocks per layer, lambda 0.01, hard masking), same seed, same data, same config otherwise. Kaggle T4, fp16, 5000 iterations, 10.6M non-embedding parameters (29.9M with the tied embedding). Raw files are in [`results/baseline/`](results/baseline/) and [`results/routed/`](results/routed/). **Each number comes from one seed**, so differences between the two runs have no error bars yet.
 
-**Final validation loss** (nats/token, last eval at iteration 5000):
+### Validation loss and cost of routing
 
-| Domain | Val loss | Start (iter 0) |
+Last eval at iteration 5000 (nats/token):
+
+| Domain | Dense | Routed | Routing cost |
+|---|---|---|---|
+| story (TinyStories) | 2.120 | 2.270 | +0.150 (+7.1%) |
+| math (synthetic) | 1.467 | 1.510 | +0.043 (+3.0%) |
+| code (codeparrot) | 2.497 | 2.659 | +0.162 (+6.5%) |
+| final train loss (mean of last 250 iters) | 2.042 | 2.175 | +0.133 |
+
+Math loss is not a measure of arithmetic skill: the operand digits are random and cannot be predicted, so the loss has a high floor.
+
+| Dense | Routed |
+|---|---|
+| ![Dense loss curves](results/baseline/loss_curves.png) | ![Routed loss curves](results/routed/loss_curves.png) |
+
+### Specialization (ablating one MLP block at a time, all 48 blocks)
+
+| | Dense | Routed |
 |---|---|---|
-| story (TinyStories) | 2.120 | 10.89 |
-| math (synthetic) | 1.467 | 10.90 |
-| code (codeparrot) | 2.497 | 10.57 |
+| **Mean S** | **0.051** | **0.110** |
+| Damage-weighted S | 0.059 | 0.160 |
+| Median S | 0.038 | 0.067 |
+| Highest single-block S | 0.19 (block 5.4) | 0.64 (block 5.0) |
+| Blocks with S above 0.2 | 0 | 8 |
+| Mean damage per ablated block (all domains summed, nats) | 0.038 | 0.405 |
+| Domain with most damage, count of blocks (story / math / code) | 23 / 6 / 19 | 20 / 16 / 12 |
 
-Final training loss (running mean over the last 250 iterations) is 2.042. Math loss is not a measure of arithmetic skill: the operand digits are random and cannot be predicted, so the loss has a high floor.
+| Dense | Routed |
+|---|---|
+| ![Dense ablation heatmap](results/baseline/ablation_heatmap.png) | ![Routed ablation heatmap](results/routed/ablation_heatmap.png) |
 
-![Train and per-domain validation loss](results/baseline/loss_curves.png)
+Note the colour scales differ: the dense heatmap tops out at 0.1 nats, the routed one at 1.5.
 
-**Ablation (zeroing one MLP block at a time, all 48 blocks).** Mean specialization **S = 0.051** (damage-weighted 0.059; the most specialised block, 5.4, reaches S = 0.19). Every single-block ablation raises the loss on every domain, and by less than 0.1 nats. The damage is mostly a layer effect: zeroing a block in layer 0 costs about 0.12 nats in total on average, against 0.014-0.025 nats for blocks in layers 1-5.
+### Block selection during routed training
 
-![Loss increase when one MLP block is zeroed](results/baseline/ablation_heatmap.png)
+Frequencies come from `results/routed/routing_stats.csv`. Uniform would be 0.25 (k/n).
 
-**One sample per domain** (checkpoint at iteration 5000, temperature 0.8; full set in `results/baseline/samples.txt`):
+- **No dead blocks.** Every block was selected at least 14.7% of the time over the whole run, and none was selected in fewer than 5% of the iterations in the last 1000.
+- **Mostly balanced.** Over the whole run, 47 of the 48 blocks were selected 15%-31% of the time. The exception is layer 0, block 6, selected 70% of the time overall (39% in the last 1000 iterations).
+- **Early imbalance eased.** The most-selected block's cumulative share fell from 0.84 (iteration 250) to 0.70 (iteration 5000).
+- **Cost in time:** training took 20 min 51 s against 19 min 25 s for dense (+7%); the whole pipeline took 25 min 29 s against 24 min 15 s.
 
-- Story, prompt `Once upon a time`:
-  > Once upon a time there lived a tidy little girl. One day she went to the park with her mom. Her mom said, "Let's go for a walk!" They had a cold, warm day and bravely walked. As they walked, they saw a man walking towards them.
-- Math, prompt `Q: 37 + 48 = A:`:
-  > Q: 37 + 48 = A: 81 / Q: 26 - 5 = A: 21 / Q: 521 x 6 = A: 3776 / Q: 4 + 9 = A: 13 / Q: 9 x 7 = A: 63
+### Samples
 
-  The format is learned. Small sums and products are mostly right, but the prompt itself is wrong (the answer is 85) and the 3-digit product is wrong (521 x 6 = 3126).
-- Code, prompt `def add(a, b):`:
-  > def add(a, b): o = b.read(), o.rstrip() ... return o / def get_list(a=None, b='None', b=None:None, b=None, ...
+Checkpoints at iteration 5000, temperature 0.8; full sets in `results/baseline/samples.txt` and `results/routed/samples.txt`.
 
-  Code-like in style but not valid or meaningful. Two of the three code samples were just runs of whitespace.
+- **Story**, prompt `Once upon a time`. Dense: *"...there lived a tidy little girl. One day she went to the park with her mom. Her mom said, "Let's go for a walk!"..."* Routed: *"...there lived a tidy little girl named Lucy. Lucy loved to play outside in the sunshine. One morning she went to a tree to pick a big tree..."* Both are readable at this scale. The routed stories were more repetitive (one sample repeats "The boat...").
+- **Math**, prompt `Q: 37 + 48 = A:`. Both models learned the format and get small sums and products right (`26 - 5 = 21`, `9 x 7 = 63`), and both get the prompt itself wrong (the answer is 85; dense gave 80-88, routed gave 88, 95 and 128) and the large products wrong (521 x 6 = 3126, but the model wrote 3776).
+- **Code**, prompt `def add(a, b):`. Dense produced one code-like fragment (`o = b.read(), o.rstrip() ...`, not valid) and two runs of whitespace. All three routed samples were whitespace. Neither model writes useful code at this scale.
 
-**Interpretation.** The dense baseline shows low specialization, as expected for a model trained with no pressure to separate domains: S = 0.05 is close to the 0 end of the scale, and no block among the 48 is strongly tied to one domain. What differs between blocks is how much they matter overall, mainly by layer, not which domain they matter for. This is a single seed, with each ablation measured on 20 batches per domain, and the damages are small, so small differences in S between blocks should not be read as real. There is no routed run yet, so these numbers are the reference that a routed model has to beat, and nothing here says whether routing helps.
+### Interpretation
+
+Routing raised specialization in the direction we hoped for: mean S doubled (0.051 to 0.110), and 8 blocks now have S above 0.2 where the dense model has none. The effect is modest and uneven, though. The median block only moved from 0.04 to 0.07, the most specialised blocks are specialised toward math (all of the five highest-S blocks hurt math most), and most blocks still damage all three domains. The routed model also pays for this: validation loss is 3-7% higher, and ablating a block now costs about ten times more loss than in the dense model (0.41 against 0.04 nats on average), so routing seems to have concentrated function into fewer blocks, not just separated it by domain. This is one seed on one dataset mix, so we cannot yet say how much of the S difference is run-to-run variation. It is not evidence that routing yields clean, label-free domain modules, and the multi-seed runs and the label-routing upper bound are what would show that.
 
 ## Quick start
 
@@ -108,7 +133,7 @@ Let $h_{l,b}(t) \in \mathbb{R}^{d/n}$ be the post-GELU hidden activation of bloc
 
 If the aux gradient is masked as well (`--route_mask_aux`), training collapses. A block that loses selection gets no gradient that could make it win again, so routing locks onto a fixed $k$ blocks per layer (the likely role of AdamW weight decay in shrinking idle blocks was not isolated). In the 100-iteration smoke run at $\lambda=0.01$, 9 of 16 blocks were never selected. Over 300 iterations, 12 of 16 were idle in the last 50 iterations (exactly $k$ alive per layer). Even $\lambda=1$ left 6 of 16 idle. Details in [`docs/findings.md`](docs/findings.md). `tests/test_routing.py::test_literal_masking_lets_blocks_die` records this behaviour.
 
-In the default mode, idle blocks keep receiving balancing gradient and do come back into selection. One block per layer still tends to win a slot on most steps.
+In the default mode, idle blocks keep receiving balancing gradient and do come back into selection. In the CPU smoke test one block per layer tended to win a slot on most steps. At full scale on the T4 selection was much more balanced (see "Block selection during routed training" under Results so far).
 
 **Caveat.** A block whose gradient is zeroed still moves slightly under AdamW: its momentum carries on for a few steps, and weight decay keeps applying. Routing controls what each block learns *from*, not whether its weights stay frozen.
 
@@ -133,4 +158,4 @@ Measured on the dense baseline run (Kaggle T4, `results/baseline/run.log`):
 
 The total is inside the 20-30 minute range I had estimated, but training took longer than my earlier 10-15 minute estimate. `train.py` prints a measured ETA every 50 iterations, which includes eval and checkpoint overhead.
 
-A routed run costs a little more per iteration. It re-runs each layer's `c_fc` on detached inputs and does a second, small backward pass for the aux loss, adding roughly 10% (an estimate, not measured on a T4); expect about 25-30 minutes for the routed pipeline.
+A routed run costs a little more per iteration, since it re-runs each layer's `c_fc` on detached inputs and does a second, small backward pass for the aux loss. Measured on the T4: training 20 min 51 s (+7%), whole pipeline 25 min 29 s.
