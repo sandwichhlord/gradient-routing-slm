@@ -1,6 +1,6 @@
 """Build presentation/midterm_deck.pptx (10 slides, 16:9).  Run from anywhere: python presentation/build_deck.py
 
-Every number comes from results/baseline, results/routed, docs/ or the configs; see the speaker notes.
+Every number comes from results/dense_v0, results/v0_batch_routing, docs/ or the configs; see the speaker notes.
 """
 import os
 import random
@@ -365,7 +365,7 @@ We trained on a free Kaggle T4 GPU; the baseline took about 19 minutes. Everythi
 # =============================================================================== 8. results
 s = new_slide()
 title(s, "Results so far", 8)
-picture(s, "results/baseline/loss_curves.png", 0.5, 1.3, w=4.5)
+picture(s, "results/dense_v0/loss_curves.png", 0.5, 1.3, w=4.5)
 text(s, 0.5, 3.98, 4.5, 0.3, "Loss curves (dense): lower is better", size=12, color=MUTED)
 rows8 = [("", "Dense", "Routed"), ("Story loss", "2.120", "2.270"), ("Math loss", "1.467", "1.510"),
          ("Code loss", "2.497", "2.659"), ("Mean S", "0.051", "0.110")]
@@ -387,8 +387,8 @@ for i, row in enumerate(rows8):
         r.font.name, r.font.size = BODY, Pt(16)
         r.font.bold = i in (0, 4)
         r.font.color.rgb = rgb(WHITE if i == 0 else INK)
-for k, (lab, rel) in enumerate([("Dense", "results/baseline/ablation_heatmap.png"),
-                                ("Routed", "results/routed/ablation_heatmap.png")]):
+for k, (lab, rel) in enumerate([("Dense", "results/dense_v0/ablation_heatmap.png"),
+                                ("Routed", "results/v0_batch_routing/ablation_heatmap.png")]):
     x = 5.3 + k * 2.2
     text(s, x, 1.25, 2.0, 0.35, lab, size=18, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
     picture(s, rel, x, 1.6, h=4.4)
