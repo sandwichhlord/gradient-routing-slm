@@ -70,3 +70,11 @@ Neither run was partial or failed: both have a checkpoint at iter 5000 and a log
 
 - Tag `v0-batch-routing` marks the code as it was before routing v1.
 - Uncommitted files in `presentation/` (`Minor_Group_55.pptx` and an edited `midterm_deck.pptx`) are yours and were left alone.
+
+## Update: routing v1 (added after the tag)
+
+- `--routing_mode {dense,batch,token,label}`, set through `ROUTING_MODE` in `run_all.sh`. `dense` and `batch` reproduce the v0 smoke metrics exactly (`tests/golden/`).
+- `SEED` (default 0) controls init and batch order. The dataset and val sets stay fixed. Old runs used seed 1337.
+- Outputs go to `out_<mode>_s<seed>/`. Put downloaded results in `results/<mode>_s<seed>/`, then run `python eval/compare.py`.
+- `python -m pytest tests/`: 41 tests, about 10 minutes on CPU.
+- **Token and label modes have only run on CPU.** No full-scale v1 result exists yet. See `docs/findings.md` and `docs/plan.md`.
