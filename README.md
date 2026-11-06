@@ -2,7 +2,7 @@
 
 Train a small GPT (nanoGPT-style) on a 3-domain corpus (stories, arithmetic, Python code), then ablate MLP blocks one at a time to see which domain each block serves.
 
-The MLP hidden layer in every transformer layer is split into `n_blocks` (8) equal blocks. `--routing_mode` picks how those blocks learn: `dense` (ordinary baseline), `batch` (v0), `token` (v1) or `label` (oracle baseline). If you are coming back to the project, start with [`docs/STATUS.md`](docs/STATUS.md).
+The MLP hidden layer in every transformer layer is split into `n_blocks` (8) equal blocks. `--routing_mode` picks how the MLP neurons learn: `assembly` (v2, the current method, which replaces the fixed blocks with self-organizing groups), or the baselines `dense`, `batch` (v0), `token` (v1) and `label` (oracle). If you are coming back to the project, start with [`docs/STATUS.md`](docs/STATUS.md).
 
 ## Module status
 
@@ -11,12 +11,13 @@ The MLP hidden layer in every transformer layer is split into `n_blocks` (8) equ
 | Data pipeline (`data/prepare.py`) | Completed. Real data (41M tokens) built and used on a T4. |
 | Baseline training (`train.py`, `configs/baseline.py`) | Completed. 5000 iterations on a T4, results below. |
 | Routing v0, batch mode (`model/routing.py`) | Completed. Implemented, unit-tested, and trained once at full scale on a T4 (single seed). |
-| Routing v1, token and label modes (`model/routing.py`) | Ongoing: implemented and unit-tested on CPU. No full-scale run yet. |
-| Evaluation harness (`eval/`) | Ongoing: loss curves, samples and the ablation matrix are done; domain probes are pending. |
+| Routing v1, token and label modes (`model/routing.py`) | Baselines. One full token run failed its health check (`docs/findings.md`, section 6). |
+| Routing v2, assembly mode (`model/assemblies.py`) | Ongoing: implemented and unit-tested on CPU. No full-scale run yet. |
+| Evaluation harness (`eval/`) | Ongoing: loss curves, samples, block and assembly ablation, random baselines and token probes are done. Unlearning and continual learning are pending. |
 
 ## Results so far
 
-These are the v0 runs: dense baseline and one batch-routed run (top-2 of 8 blocks per layer, lambda 0.01, hard masking), same seed, same data, same config otherwise. Routing v1 has not been run at full scale yet. Kaggle T4, fp16, 5000 iterations, 10.6M non-embedding parameters (29.9M with the tied embedding). Raw files are in [`results/dense_v0/`](results/dense_v0/) and [`results/v0_batch_routing/`](results/v0_batch_routing/). **Each number comes from one seed**, so differences between the two runs have no error bars yet.
+`results/token_s0/` and the v2 assembly runs are not covered here yet. These are the v0 runs: dense baseline and one batch-routed run (top-2 of 8 blocks per layer, lambda 0.01, hard masking), same seed, same data, same config otherwise.  Kaggle T4, fp16, 5000 iterations, 10.6M non-embedding parameters (29.9M with the tied embedding). Raw files are in [`results/dense_v0/`](results/dense_v0/) and [`results/v0_batch_routing/`](results/v0_batch_routing/). **Each number comes from one seed**, so differences between the two runs have no error bars yet.
 
 ### Validation loss and cost of routing
 
@@ -78,17 +79,22 @@ Routing raised specialization in the direction we hoped for: mean S doubled (0.0
 
 ```bash
 pip install -r requirements.txt
-python -m pytest tests/                        # about 10 min on CPU (includes full smoke pipelines)
-SMOKE=1 ROUTING_MODE=token bash run_all.sh     # about 1 min on CPU: synthetic data, 2 layers, 64 dim, 100 iters
-ROUTING_MODE=token SEED=0 bash run_all.sh      # full run on real data -> out_token_s0/ (needs internet; use a GPU)
+python -m pytest tests/                        # about 15-20 min on CPU (includes full smoke pipelines)
+SMOKE=1 ROUTING_MODE=assembly bash run_all.sh  # about 2 min on CPU: synthetic data, 2 layers, 64 dim, 100 iters
+ROUTING_MODE=assembly SEED=0 bash run_all.sh   # full run on real data -> out_assembly_s0/ (needs internet; use a GPU)
+ROUTING_MODE=dense POSTHOC=1 bash run_all.sh   # dense run plus the post-hoc assembly control
+python eval/ablate_assemblies.py --out_dir results/dense_v0 --source posthoc   # post hoc on any existing checkpoint
 python eval/compare.py                         # results/comparison.csv and comparison.png from results/<run>/
 ```
 
-`run_all.sh` runs `prepare -> train -> sample -> plots -> ablate -> routing plot` and stops at the first error. Environment variables:
+`run_all.sh` runs `prepare -> train -> sample -> plots -> ablate -> routing or assembly evaluation` and stops at the first error. Environment variables:
 
 | Variable | Meaning |
 |---|---|
-| `ROUTING_MODE` | `dense` (default), `batch`, `token`, `label` |
+| `ROUTING_MODE` | `dense` (default), `batch`, `token`, `label`, `assembly` |
+| `RESOLUTION`, `FLOOR`, `PLASTICITY` | Assembly settings, defaults `1.0`, `0.1`, `rank`. Other values get their own folder, e.g. `out_assembly_r0.5_s0` |
+| `LR_SCALE` | Scales the learning rate, for a dense run matched to an assembly run's mean plasticity |
+| `POSTHOC=1` | Also cluster the finished model post hoc and ablate it (the dense control) |
 | `SEED` | Default 0. Controls model init and batch order. The dataset and validation sets stay fixed across seeds so runs are comparable |
 | `MAX_ITERS` | Overrides the config's `max_iters` |
 | `OUT_DIR`, `DATA_DIR` | Default `out_<mode>_s<seed>` and `data/out` |
@@ -99,10 +105,10 @@ python eval/compare.py                         # results/comparison.csv and comp
 
 1. Import `kaggle_run.ipynb` into Kaggle. It clones this repo's default branch.
 2. Settings: **Accelerator: GPU T4**, **Internet: On**.
-3. Set `ROUTING_MODE`, `SEED` and `MAX_ITERS` in the first cell, then **Run All**.
-4. Download `/kaggle/working/<mode>_s<seed>.zip` and unzip it into `results/<mode>_s<seed>/`.
+3. Set the first cell (`ROUTING_MODE`, `SEED`, `MAX_ITERS`, `RESOLUTION`, `FLOOR`, `POSTHOC`, and so on), then **Run All**. To evaluate an existing checkpoint without training, upload it as a Kaggle dataset and set `POSTHOC_CKPT`.
+4. Download the zip from `/kaggle/working/` and unzip it into `results/<zip name>/`. The notebook installs `igraph` and `leidenalg`.
 
-The notebook prints `DATA MODE: real` near the end. Any other value means the HuggingFace download failed and the run used the synthetic fallback. Each run takes well under an hour (see Runtime below), far below Kaggle's 12-hour limit.
+The notebook prints `DATA MODE: real` near the end. Any other value means the HuggingFace download failed and the run used the synthetic fallback. Runs take about an hour (see Runtime below), far below Kaggle's 12-hour limit.
 
 ## Files
 
@@ -112,10 +118,14 @@ The notebook prints `DATA MODE: real` near the end. Any other value means the Hu
 | `model/model.py` | The GPT. `set_ablation(layer, block)`, `set_block_mask(layer, mask)`, `clear_ablation()`, `record_block_norms(on)`, `get_block_norms()` |
 | `train.py` | Training loop with fp16 AMP and GradScaler on CUDA, fp32 on CPU, warmup plus cosine LR, eval on each domain, ETA printout, tokens/sec in `metrics.csv`, `--resume` |
 | `model/routing.py` | `GradientRouter` (batch mode, v0) and `TokenRouter` (token and label modes, v1). See Method |
+| `model/assemblies.py` | Assembly mode (v2): co-activation tracking, clustering, plasticity, health checks |
 | `configs/baseline.py`, `configs/routed.py`, `configs/smoke.py` | Configs. Precedence: defaults < config file < CLI flags. `routed.py` = baseline + batch mode. `run_all.sh` uses `baseline.py` plus `--routing_mode` |
 | `eval/sample.py` | `out/samples.txt`: 3 samples for each of 3 prompts |
 | `eval/plots.py` | `out/loss_curves.png` |
 | `eval/routing_plot.py` | `routing_by_domain.png`: per layer, the fraction of each domain's tokens selecting each block |
+| `eval/ablate_assemblies.py` | Ablates each assembly, from a run's final partition or post hoc on any checkpoint: S, size- and damage-weighted S, size-matched random baseline, bootstrap CIs |
+| `eval/assembly_probe.py` | `assembly_probe.csv` (top tokens, correlation with position and token frequency) and `assembly_domain_profile.csv` |
+| `eval/assembly_health_plot.py` | `assembly_health.png`: number of assemblies and ARI over training |
 | `eval/compare.py` | `results/comparison.csv` and `comparison.png`: final loss, mean S and speed per run, mean and std across seeds |
 | `eval/ablate.py` | `out/ablation.csv`, `ablation_heatmap.png`, `ablation_summary.txt`, `block_norms.csv`. Before the sweep it asserts that the mask actually changes the logits. |
 
@@ -130,7 +140,26 @@ For each block, damage on domain d is `loss_ablated[d] - loss_unablated[d]`. All
 
 ## Method: activation-based gradient routing
 
-There are four modes. `dense` is the baseline. `batch` is the original method (v0), kept unchanged. `token` is v1. `label` is an oracle baseline for v1. All modes use the same forward computation, so routing only changes which weights learn from what. Why v1 replaced v0 is in [`docs/findings.md`](docs/findings.md).
+There are five modes. `assembly` (v2) is the current method. `dense` is the baseline, `batch` is the original method (v0), `token` is v1 and `label` is an oracle baseline. All modes use the same forward computation, so routing only changes how weights learn. Why each version replaced the last, and the open reviewer concerns, are in [`docs/findings.md`](docs/findings.md).
+
+### Assembly mode (v2)
+
+This is Hebbian co-activation clustering. Cannistraci-Hebb Training is related inspiration, not the method. Training is plain dense until `--cluster_start` (500). Per layer:
+
+1. **Co-activation.** An EMA (decay 0.99, no gradient) of the correlation matrix of the $d$ hidden activations, from about 512 sampled tokens per step.
+2. **Assemblies.** At step 500 and every `--cluster_every` (500) steps after: keep each neuron's top `--knn` (32) positive correlations, symmetrize, and run Leiden (`--resolution` 1.0; Louvain if Leiden is unavailable). Groups below `--min_size` (16) merge into their most correlated neighbour, and Hungarian matching keeps IDs stable. Neurons with variance below $10^{-8}$ are left out and put in a leftover group with plasticity 1.
+3. **Relative activity.** $r(t,g)$ is the mean $|h|$ over assembly $g$ at token $t$, divided by the mean over its current members of each neuron's recent activity.
+4. **Plasticity.** With $G$ assemblies and floor $f$ (`--floor`, 0.1), the default `--plasticity rank` gives
+   $$p(t,g) = f + (1-f)\left(1 - \frac{\mathrm{rank}_t(g)}{G-1}\right),$$
+   so at each token the most active assembly gets 1 and the least active gets $f$. `--plasticity sigmoid` gives $p = f + (1-f)\,\sigma(\alpha(r-1))$ with $\alpha = 4$. No neuron ever has zero plasticity.
+5. **Gradient scaling on both projections,** with $P$ the per-neuron multiplier and the forward output unchanged:
+   $$y = (h \odot P)\,W_\text{down}^\top + \mathrm{stopgrad}(h \odot (1-P))\,\mathrm{stopgrad}(W_\text{down})^\top + b.$$
+   In the last layer, a token's gradient on $W_\text{up}$ rows and $W_\text{down}$ columns is exactly $P$ times the dense gradient, which a test checks. Earlier layers also receive gradient through the tokens a later token attends to.
+6. **Health checks.** A layer with fewer than 4 assemblies, or one holding more than half its neurons, is flagged degenerate and trains dense until a later clustering recovers. `assemblies.csv` records this after every clustering, with ARI, splits, merges, dead neurons and sizes.
+
+`--consolidate` (off by default) lowers an assembly's ceiling to $1/(1+\beta\cdot\text{age})$ once its membership has stayed above 0.8 overlap. Adam probably cancels most of this effect, so it is not ready to use (`docs/findings.md`, section 8).
+
+**Evaluation.** `eval/ablate_assemblies.py` zeroes each assembly's neurons and computes S per assembly, mean S, size-weighted and damage-weighted S, bootstrap CIs, and a baseline of 5 random neuron sets of the same size per assembly. On a checkpoint with no assemblies, such as dense, it runs the same clustering post hoc on held-out data. That post-hoc dense number is the key control, because dense models already contain somewhat specialised co-activation groups. Clustering uses the first half of each val set and scoring uses the second half, so these S values are comparable with each other but not with the 8-block S from `eval/ablate.py`.
 
 ### Token mode (v1)
 
@@ -193,4 +222,6 @@ Measured on the dense baseline run (Kaggle T4, `results/dense_v0/run.log`):
 
 The total is inside the 20-30 minute range I had estimated, but training took longer than my earlier 10-15 minute estimate. `train.py` prints a measured ETA every 50 iterations, which includes eval and checkpoint overhead.
 
-Batch mode measured on the T4: training 20 min 51 s (+7%), whole pipeline 25 min 29 s. Token and label modes have not run on a GPU. On CPU their overhead was within noise, so the estimate is 25-35 minutes per full pipeline, far below the 12-hour session limit.
+Other modes, measured on the T4: batch training 20 min 51 s, whole pipeline 25 min 29 s; token training 21 min 6 s, whole pipeline 25 min 56 s.
+
+Assembly mode has not run on a GPU, so these are estimates. Training should take about 21-23 min, like token mode. The block ablation takes about 4 min. Assembly ablation takes about 4.5 s per ablated set: with 46 assemblies (what clustering gave on `dense_v0` at resolution 1.0) and 5 random sets each, that is about 21 min, plus 1-2 min for post-hoc clustering and the probes. So an assembly run or a dense run with `POSTHOC=1` takes about 50 min. Higher resolution means more assemblies, so `RESOLUTION=2.0` may take 60-90 min.

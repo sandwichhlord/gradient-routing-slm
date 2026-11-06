@@ -3,3 +3,8 @@ numpy
 tiktoken
 datasets
 matplotlib
+scipy
+igraph
+leidenalg
+networkx
+pytest

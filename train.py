@@ -7,7 +7,8 @@ Config precedence: built-in DEFAULTS < --config file (e.g. configs/baseline.py) 
 
 fp16 autocast + GradScaler on CUDA (no bf16, no torch.compile); fp32 on CPU.
 Writes out_dir/metrics.csv (iter, train_loss, val_story, val_math, val_code, lr, elapsed_s) and out_dir/ckpt.pt.
---routing_mode picks the method (model/routing.py): dense (baseline), batch (v0), token (v1), label (oracle baseline).
+--routing_mode picks the method: dense (baseline), batch (v0), token (v1), label (oracle baseline), all in
+model/routing.py, or assembly (v2, model/assemblies.py), which writes out_dir/assemblies.csv and assemblies_final.json.
 Any routed mode also writes out_dir/routing_stats.csv. --routing is the old spelling of --routing_mode batch.
 train_loss is always the LM loss alone. tokens_per_sec excludes eval and checkpoint time.
 """
@@ -26,9 +27,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (DOMAINS, ROOT, PureWindowSampler, autocast_ctx, eval_domains, get_batch,  # noqa: E402
                     load_config_file, load_val, make_grad_scaler, open_bin, open_domains, pick_device)
 from model.model import GPT, GPTConfig  # noqa: E402
+from model.assemblies import AssemblyRouter  # noqa: E402
 from model.routing import GradientRouter, TokenRouter  # noqa: E402
 
-ROUTING_MODES = ("dense", "batch", "token", "label")
+ROUTING_MODES = ("dense", "batch", "token", "label", "assembly")
 
 DEFAULTS = dict(
     # io
@@ -48,6 +50,11 @@ DEFAULTS = dict(
     # route_gamma (bias step) is token mode only; route_ema is the frequency EMA in batch and the energy EMA in token
     routing_mode="dense", routing=False, route_k=2, route_eps=0.0, route_lambda=0.01, route_ema=0.99,
     route_mask_aux=False, route_gamma=0.001,
+    # assembly mode (route_ema is its correlation and activity EMA)
+    cluster_start=500, cluster_every=500, knn=32, resolution=1.0, min_size=16, floor=0.1, alpha=4.0,
+    plasticity="rank", consolidate=False, beta=0.5, assembly_sample_tokens=512,
+    # scales the whole learning rate schedule, e.g. a dense run matched to an assembly run's mean plasticity
+    lr_scale=1.0,
 )
 
 
@@ -81,6 +88,8 @@ def get_config(argv=None):
     cfg.update({k: v for k, v in vars(args).items() if k != "config" and v is not None})
     if cfg["routing"] and cfg["routing_mode"] == "dense":
         cfg["routing_mode"] = "batch"
+    if cfg["plasticity"] not in ("rank", "sigmoid"):
+        raise ValueError(f"plasticity={cfg['plasticity']!r}, expected rank or sigmoid")
     if cfg["routing_mode"] not in ROUTING_MODES:
         raise ValueError(f"routing_mode={cfg['routing_mode']!r}, expected one of {ROUTING_MODES}")
     cfg["routing"] = cfg["routing_mode"] == "batch"
@@ -88,6 +97,10 @@ def get_config(argv=None):
 
 
 def lr_at(it, c):
+    return c["lr_scale"] * _base_lr(it, c)
+
+
+def _base_lr(it, c):
     if it < c["warmup_iters"]:
         return c["learning_rate"] * (it + 1) / (c["warmup_iters"] + 1)
     if it >= c["max_iters"]:
@@ -139,11 +152,19 @@ def main(argv=None):
         router = TokenRouter(model, mode=mode, k=c["route_k"], gamma=c["route_gamma"], ema=c["route_ema"])
         print(f"[train] per-token routing ON: mode={mode}, k={c['route_k']}, gamma={c['route_gamma']}, "
               f"ema={c['route_ema']}")
+    elif mode == "assembly":
+        router = AssemblyRouter(model, cluster_start=c["cluster_start"], cluster_every=c["cluster_every"], knn=c["knn"],
+                                resolution=c["resolution"], min_size=c["min_size"], floor=c["floor"], alpha=c["alpha"],
+                                plasticity=c["plasticity"], ema=c["route_ema"], consolidate=c["consolidate"], beta=c["beta"],
+                                sample_tokens=c["assembly_sample_tokens"], seed=c["seed"])
+        print(f"[train] assembly routing ON: dense until step {c['cluster_start']}, re-cluster every "
+              f"{c['cluster_every']}, knn={c['knn']}, resolution={c['resolution']}, min_size={c['min_size']}, "
+              f"floor={c['floor']}, plasticity={c['plasticity']}, alpha={c['alpha']}, consolidate={c['consolidate']}")
     if mode == "label":
         sampler = PureWindowSampler(c["data_dir"], c["block_size"])
         print("[train] label mode: domain-pure windows, domain mix " + ", ".join(
             f"{d} {p:.3f}" for d, p in zip(DOMAINS, sampler.p)))
-    elif mode in ("batch", "token"):
+    elif mode in ("batch", "token", "assembly"):
         train_domains = open_domains(c["data_dir"], len(train_data))  # logging only
 
     def next_batch():
@@ -159,7 +180,10 @@ def main(argv=None):
 
     ckpt_path = os.path.join(c["out_dir"], "ckpt.pt")
     metrics_path = os.path.join(c["out_dir"], "metrics.csv")
-    routing_path = os.path.join(c["out_dir"], "routing_stats.csv")
+    routing_path = os.path.join(c["out_dir"], "assemblies.csv" if mode == "assembly" else "routing_stats.csv")
+    assignments_path = os.path.join(c["out_dir"], "assemblies_final.json")
+    if mode == "assembly":
+        router.log_path = routing_path
     start_iter = 0
     if c["resume"] and os.path.exists(ckpt_path):
         ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
@@ -174,7 +198,7 @@ def main(argv=None):
     else:
         with open(metrics_path, "w", newline="") as f:
             csv.writer(f).writerow(["iter", "train_loss", *[f"val_{d}" for d in DOMAINS], "lr", "elapsed_s",
-                                    "tokens_per_sec"])
+                                    "tokens_per_sec", *[f"act_norm_l{i}" for i in range(c["n_layer"])]])
         if os.path.exists(routing_path):
             os.remove(routing_path)
 
@@ -184,14 +208,21 @@ def main(argv=None):
                     "model_args": model_args, "config": c, "iter": it,
                     "router": router.state_dict() if router is not None else None}, tmp)
         os.replace(tmp, ckpt_path)  # atomic: a crash mid-save never corrupts the last good checkpoint
+        if mode == "assembly":
+            router.write_assignments(assignments_path)
+            router.write_summary(os.path.join(c["out_dir"], "summary.txt"))
         print(f"[train] saved checkpoint @ iter {it} -> {ckpt_path}", flush=True)
 
     def evaluate(it, train_loss, lr, tokens_per_sec=None):
+        model.record_block_norms(True)   # per-layer activation size on the val windows, so a blow-up is visible
         losses = eval_domains(model, val_data, c["eval_iters"], c["batch_size"], c["block_size"], device)
+        act_norms = model.get_block_norms().mean(dim=1).tolist()
+        model.record_block_norms(False)
         with open(metrics_path, "a", newline="") as f:
             csv.writer(f).writerow([it, f"{train_loss:.5f}", *[f"{losses[d]:.5f}" for d in DOMAINS], f"{lr:.3e}",
                                     f"{time.time() - t_start:.1f}",
-                                    "" if tokens_per_sec is None else f"{tokens_per_sec:.0f}"])
+                                    "" if tokens_per_sec is None else f"{tokens_per_sec:.0f}",
+                                    *[f"{a:.3f}" for a in act_norms]])
         print(f"[eval] iter {it}: train {train_loss:.4f} | " + " | ".join(f"{d} {losses[d]:.4f}" for d in DOMAINS), flush=True)
         if router is not None and router.steps > 0:
             router.log(it, routing_path)
@@ -216,7 +247,7 @@ def main(argv=None):
             g["lr"] = lr
 
         for _ in range(c["grad_accum"]):
-            if mode in ("token", "label"):
+            if mode in ("token", "label", "assembly"):
                 router.set_batch(dom)
             with ctx:
                 _, loss = model(x, y)
@@ -231,7 +262,7 @@ def main(argv=None):
         if c["grad_clip"] > 0:
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), c["grad_clip"])
-        if mode in ("token", "label"):
+        if mode in ("token", "label", "assembly"):
             router.step(optimizer, scaler)
         else:
             scaler.step(optimizer)

@@ -96,3 +96,87 @@ Design: per-token selection on relative scores (norm / EMA), bias balancing with
 The token model's tokens from different domains pick visibly different blocks, with some math cells at 0.00 where story is above 0.5. This is encouraging but is not specialization: selection differing by domain does not show that ablating a block hurts only that domain. Part of it may be simple input statistics. The bias was still growing at step 500 (-0.28 to +0.32).
 
 Speed at full model size on CPU (batch 4, two 40-iteration passes, tokens/s): dense 330 and 330, batch 328 and 302, token 363 and 343, label 369 and 335. Overhead is within noise on CPU. It has not been measured on a GPU.
+
+## 6. First full-scale token run (token_s0): separates domains, but training is unhealthy
+
+T4, 5000 iterations, seed 0. One run. fp16 is not the cause: Adam took 4998 of 5000 steps.
+
+| Check | Result | Verdict |
+|---|---|---|
+| Loss falls smoothly, no NaN | No NaN, but the best point is near iteration 1250-3750 and the loss jumps around (final train 3.31, dense 2.04) | **Fail** |
+| Domains pick different blocks | Mean per-domain gap 0.34 (0.42 at its peak). Clear in layers 0-2, weak in layers 3-5 | Pass |
+| No block stuck at 0% | Whole-run fractions 0.246-0.256, last window 0.240-0.259, no dead blocks | Pass |
+| S against dense_v0 | Mean S 0.208 vs 0.051, but see below | Not trustworthy yet |
+
+| Final val loss | dense_v0 | v0_batch_routing | token_s0 |
+|---|---|---|---|
+| story | 2.120 | 2.270 | 3.649 (+72% on dense) |
+| math | 1.467 | 1.510 | 1.929 (+32%) |
+| code | 2.497 | 2.659 | 3.961 (+59%) |
+
+**Activations blew up.** Measured from the checkpoints on real validation windows:
+
+| | dense_v0 | v0_batch_routing | token_s0 |
+|---|---|---|---|
+| Block activation norm, layer 3 | 3.1 | 4.2 | 178 |
+| Block activation norm, layer 5 | 4.1 | 5.5 | 180 |
+| MLP output / MLP input norm, layer 5 | 0.60 | 0.54 | 66 |
+| Cancellation ratio, layer 3: norm of summed block outputs / sum of block output norms (1 = none) | 0.52 | 0.34 | 0.075 |
+| Mean damage per ablated block (nats) | 0.038 | 0.405 | 7.3 |
+| Largest damage to one domain (nats) | 0.10 | 1.52 | 29.7 |
+
+Blocks became very large and mostly cancel each other. **Hypothesis, not tested:** each token can only train its 2 selected blocks, so those learn to offset the output of the 6 it cannot change, and this feeds on itself. Whether the cause is the masking or the changing selection is unknown. Label mode uses the same masking with fixed selection, so it can separate the two.
+
+**How to read S here.** Mean S rose to 0.208, but damage-weighted S is 0.079, below v0's 0.160. Damage in layers 4-5 is huge and shared across domains (block 5.5 costs +24 to +30 nats on all three). The real signal is in the early layers: mean S is 0.46 and 0.36 in layers 0-1, and damage follows selection there (correlation between selection share and damage share per domain: +0.86, +0.89, +0.80 in layers 0-2, against -0.03, +0.20, +0.49 in layers 3-5). For example, blocks 0.2 and 0.3 are selected by 76% of math tokens and mostly hurt math. So early-layer domain separation looks real in this one run, in a model that trains badly.
+
+Speed: training took 21m06s and about 39.7K tokens/s (+9% time on dense). The whole pipeline took 25m56s.
+
+## 7. Routing v2: self-organizing assemblies with graded plasticity
+
+**Why we pivoted.** The 8 x 192 blocks are arbitrary: nothing in the network makes those neurons belong together. And `token_s0` showed that hard per-token masking can go with blocks that grow huge and cancel each other out (section 6). v2 lets neuron groups form from Hebbian co-activation, and it uses graded per-group plasticity in place of hard masks, so no neuron is ever cut off from a token's gradient.
+
+**What we did not establish.** `label_s0` was not run, so section 6 never separated whether the blow-up came from the masking or from the changing selection. v2 changes both, so if it trains well we will not know which change fixed it. `metrics.csv` now logs per-layer activation norms in every mode, so a blow-up is visible during a run.
+
+**Terminology.** This is Hebbian co-activation clustering. Cannistraci-Hebb Training (CHT) is related inspiration only, and is not the method.
+
+**Method summary** (full version in the README):
+- Per layer, an EMA of the correlation matrix of the hidden activations, from about 512 sampled tokens per step.
+- From step 500, every 500 steps: kNN graph, Leiden, merge small groups, keep IDs stable with Hungarian matching.
+- Per token, each assembly's plasticity depends on its relative activity, and it scales the gradient on both projections with the forward output unchanged.
+- Default plasticity is `rank`: the most active assembly at a token gets 1 and the least active gets the floor. `sigmoid` was the first design. It stays available, but rank guarantees a spread of plasticity, where sigmoid could leave nearly every assembly near the same value.
+
+**Health checks.** After every clustering, each layer logs its number of assemblies, largest fraction, fraction of neurons in small assemblies, dead neurons, splits, merges and ARI. Dead or constant neurons (variance below 1e-8) are left out of the graph and put in a leftover group (ID -1) with plasticity 1, outside the ranking. A layer with fewer than 4 assemblies, or one holding more than half the neurons, is flagged degenerate and trains dense until a later clustering recovers. These thresholds are judgement calls.
+
+**First real data: post-hoc control on `dense_v0`.** CPU, with a much reduced evaluation: 150 batches for clustering, and 8 windows per domain per ablation, on a small real-data sample whose validation windows come from the same sources as this model's training data and may overlap it. Treat these as preliminary. A run on the real val sets replaces them.
+
+| | Real assemblies | Random sets of the same size |
+|---|---|---|
+| Assemblies per layer | 6, 7, 8, 8, 8, 9 (none degenerate, no dead neurons) | |
+| Mean S | 0.153, bootstrap 95% CI [0.104, 0.209] | 0.090, CI [0.066, 0.115] |
+| Real minus random S | CI [0.011, 0.119] | |
+| Damage per neuron (nats) | 0.0021 | 0.00025 |
+
+So a model trained with **no routing** already has co-activation groups that are more specialised than random sets, with about 8 times the damage per neuron. For example, layer 0 assembly 2's top tokens are digits and `=`. This is why the post-hoc dense control matters: assembly mode only shows something if it beats this number, not if it beats 0.051 from the fixed blocks.
+
+## 8. Reviewer concerns
+
+What a sceptical reviewer would ask, and where we stand. "Open" means we have no answer yet.
+
+| Concern | Status |
+|---|---|
+| **Does the clustering find specialization that already exists?** Dense models have domain-aligned groups too (section 7). | Addressed by design: `eval/ablate_assemblies.py --source posthoc` on the same dense checkpoint. Assembly mode must beat that, not the fixed-block number. |
+| **Is S just a side effect of group size, or of removing many neurons?** | Addressed: each assembly is compared with 5 random neuron sets of the same size, reporting S and damage per neuron. |
+| **Is S confounded with how critical a group is?** Section 6 had high S with enormous shared damage. | Partly addressed: size-weighted and damage-weighted S, damage per neuron, and activation norms in `metrics.csv`. S still cannot separate the two on its own. |
+| **Are clusters flattered by being scored on the data that formed them?** | Addressed: post-hoc clustering uses the first half of each val set, and scoring always uses the second half. |
+| **Do the error bars mean anything?** | Partly. Bootstrap CIs resample assemblies inside one model. They ignore variation between seeds, and assemblies in a model are not independent. Only the 3-seed runs answer this. |
+| **Do assemblies encode domain, or just token frequency and position?** | Measured, not settled: `eval/assembly_probe.py` reports top tokens and correlations with position and log frequency. On the preliminary dense control, mean absolute correlation was 0.12 with position and 0.21 with log frequency, and up to about 0.67 with frequency in layer 0. Some assemblies are at least partly frequency detectors. |
+| **Does graded plasticity do anything under Adam?** Adam divides by a running gradient scale, so scaling a parameter's gradient by a constant leaves its update almost unchanged (`test_adam_cancels_a_constant_gradient_scale` shows this). What survives is the variation: a neuron learns more from tokens where its plasticity is high, compared with its other tokens. So the mean of p is not an effective learning rate. | Open. The `LR_SCALE` dense control therefore tests a stronger change than routing actually makes. Read it as a conservative comparison, not an exact match. |
+| **Does consolidation harden anything under Adam?** A slowly decaying ceiling is close to a constant scale, so Adam would largely undo it. | Open, and important before anyone uses `--consolidate`. A real version probably has to scale the parameter update rather than the gradient. It is off by default and deferred. |
+| **Do partitions stay stable enough to matter?** If membership churns, no group accumulates a specialty. | Measured per clustering (ARI, splits, merges, `assembly_health.png`). Smoke ARI was low (0.2-0.5), on a tiny model that is still changing fast. Real values are unknown. |
+| **Is the correlation estimate reliable?** A sample of 512 tokens for 1536 neurons gives a rank-deficient matrix per step. | Mitigated: the EMA pools about 100 steps, so roughly 50K tokens. Not tested for sensitivity to sample size. |
+| **Does a token's plasticity really apply to that token only?** | No. The scaling is exact only in the last layer. Attention carries a later token's loss back through earlier tokens, which have their own plasticity, and training windows mix domains. The test covers the last layer only. |
+| **Rank plasticity ignores how active a group is.** The top group gets 1 even when every group is near baseline. | Open by design. Compare with `PLASTICITY=sigmoid` if rank looks wrong. |
+| **Thresholds and settings are arbitrary:** resolution, kNN, min size, floor, the degenerate limits, the 0.25 split and merge share. | Partly addressed: resolutions 0.5 and 2.0 are in the run order. The others are not swept. |
+| **Positive correlations only.** Anti-correlated neurons never link, so opposing pairs that work together are ignored. | Accepted limitation. |
+| **Does training with p < 1 simply train less?** | Measured: the loss curves compare directly with dense, and `summary.txt` records mean p. On smoke runs mean p after clustering was about 0.55, as rank predicts. |
+
