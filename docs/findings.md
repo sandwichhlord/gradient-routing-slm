@@ -62,3 +62,37 @@ Full tables and plots are in "Results so far" in the README. Dense and routed ru
 - **Activations did not become more domain-specific.** The spread of each block's mean activation norm across the three domains, (max - min) / mean, averaged 0.295 for dense and 0.306 for routed. The specialization shows up in ablation damage and not in how strongly blocks fire per domain.
 
 **Limits.** One seed per arm, 20 evaluation batches per ablation, a small model, and no label-routed upper bound yet. The S difference between the two runs is not established until it holds across seeds.
+
+## 3. Why v0 was replaced: its failure modes
+
+- **One choice per batch.** A batch mixes stories, math and code, so one selection averages over all three. Selection cannot follow the domain of each token, which is the thing we want it to learn.
+- **Selection rewards magnitude.** Raw energy favours blocks that are already large. On the T4, layer 0 block 6 was selected 70% of the time, and ablation damage grew about 10x.
+- **The balancing loss competes with the task.** It needed its gradient to bypass the mask (section 1), so idle blocks were never truly isolated.
+- **AdamW moved masked blocks.** Zero gradient does not stop momentum or weight decay.
+- **Gradient still reached earlier layers through unselected blocks,** because v0 masks at the weights.
+
+## 4. The W_down masking problem
+
+Moving to per-token masks needs masking on activations, since weight hooks only see a gradient already summed over tokens. The obvious way, `h*m + (h*(1-m)).detach()`, is wrong: W_down is multiplied by the full activation, so it still receives gradient from every block. `test_naive_masking_of_h_alone_leaks_into_w_down` demonstrates this.
+
+**v0 did not have this bug.** Its weight hooks zero both W_up rows and W_down columns, per batch. The bug is a trap for per-token masking, and v1 avoids it by computing `F.linear(h_sel, W_down) + F.linear(h_rest, W_down.detach())`.
+
+## 5. v1 design and what we have measured so far
+
+Design: per-token selection on relative scores (norm / EMA), bias balancing with no aux loss, masking on both projections, and truly skipped optimizer updates for zero-gradient slices. Details are in the README Method section.
+
+**A limit we found while testing:** "a token's loss only reaches its own blocks" is true only in the last layer, or for the first token. Attention carries a later token's loss back through earlier tokens, so earlier layers receive the union of blocks selected by the token and those before it. Label mode would leak across domains on mixed windows, so it trains on domain-pure windows. Token mode still uses mixed windows.
+
+**CPU measurements only (2 layers, 64 dim, one seed). None of this is a full-scale result.**
+
+| Check | Result |
+|---|---|
+| Smoke data, 300 steps, cumulative selection | 0.17-0.34 (seed 1337), 0.18-0.32 (seed 0), no dead blocks |
+| Same runs, last 50-step window | 0.016-0.37 and 0.005-0.34: bursty |
+| Real-data sample, 500 steps, last 100-step window | 0.15-0.43 |
+| Real-data sample, 500 steps, per-domain selection gap (max - min across domains, mean over blocks) | token 0.48, batch 0.17 |
+| Same run, val loss story / math / code | token 5.62 / 2.64 / 5.53, batch 5.36 / 2.55 / 5.44 |
+
+The token model's tokens from different domains pick visibly different blocks, with some math cells at 0.00 where story is above 0.5. This is encouraging but is not specialization: selection differing by domain does not show that ablating a block hurts only that domain. Part of it may be simple input statistics. The bias was still growing at step 500 (-0.28 to +0.32).
+
+Speed at full model size on CPU (batch 4, two 40-iteration passes, tokens/s): dense 330 and 330, batch 328 and 302, token 363 and 343, label 369 and 335. Overhead is within noise on CPU. It has not been measured on a GPU.

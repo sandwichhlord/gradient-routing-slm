@@ -2,7 +2,7 @@
 
 Train a small GPT (nanoGPT-style) on a 3-domain corpus (stories, arithmetic, Python code), then ablate MLP blocks one at a time to see which domain each block serves.
 
-The MLP hidden layer in every transformer layer is split into `n_blocks` (8) equal blocks. The baseline trains as an ordinary dense model. The block hooks (ablation mask and per-block activation norms) only switch on at inference, and are there for later gradient-routing experiments.
+The MLP hidden layer in every transformer layer is split into `n_blocks` (8) equal blocks. `--routing_mode` picks how those blocks learn: `dense` (ordinary baseline), `batch` (v0), `token` (v1) or `label` (oracle baseline). If you are coming back to the project, start with [`docs/STATUS.md`](docs/STATUS.md).
 
 ## Module status
 
@@ -10,12 +10,13 @@ The MLP hidden layer in every transformer layer is split into `n_blocks` (8) equ
 |---|---|
 | Data pipeline (`data/prepare.py`) | Completed. Real data (41M tokens) built and used on a T4. |
 | Baseline training (`train.py`, `configs/baseline.py`) | Completed. 5000 iterations on a T4, results below. |
-| Routing module (`model/routing.py`) | Completed. Implemented, unit-tested, and trained once at full scale on a T4 (single seed). |
+| Routing v0, batch mode (`model/routing.py`) | Completed. Implemented, unit-tested, and trained once at full scale on a T4 (single seed). |
+| Routing v1, token and label modes (`model/routing.py`) | Ongoing: implemented and unit-tested on CPU. No full-scale run yet. |
 | Evaluation harness (`eval/`) | Ongoing: loss curves, samples and the ablation matrix are done; domain probes are pending. |
 
 ## Results so far
 
-Dense baseline and one gradient-routed run (top-2 of 8 blocks per layer, lambda 0.01, hard masking), same seed, same data, same config otherwise. Kaggle T4, fp16, 5000 iterations, 10.6M non-embedding parameters (29.9M with the tied embedding). Raw files are in [`results/dense_v0/`](results/dense_v0/) and [`results/v0_batch_routing/`](results/v0_batch_routing/). **Each number comes from one seed**, so differences between the two runs have no error bars yet.
+These are the v0 runs: dense baseline and one batch-routed run (top-2 of 8 blocks per layer, lambda 0.01, hard masking), same seed, same data, same config otherwise. Routing v1 has not been run at full scale yet. Kaggle T4, fp16, 5000 iterations, 10.6M non-embedding parameters (29.9M with the tied embedding). Raw files are in [`results/dense_v0/`](results/dense_v0/) and [`results/v0_batch_routing/`](results/v0_batch_routing/). **Each number comes from one seed**, so differences between the two runs have no error bars yet.
 
 ### Validation loss and cost of routing
 
@@ -77,22 +78,31 @@ Routing raised specialization in the direction we hoped for: mean S doubled (0.0
 
 ```bash
 pip install -r requirements.txt
-SMOKE=1 bash run_all.sh   # ~1 min on CPU: synthetic data, 2 layers, 64 dim, 100 iters
-bash run_all.sh           # full run: real data + configs/baseline.py (needs internet; use a GPU)
-ROUTED=1 bash run_all.sh  # full run with gradient routing (configs/routed.py) -> out_routed/
-python -m pytest tests/   # block hooks + routing tests (~1 min on CPU)
+python -m pytest tests/                        # about 10 min on CPU (includes full smoke pipelines)
+SMOKE=1 ROUTING_MODE=token bash run_all.sh     # about 1 min on CPU: synthetic data, 2 layers, 64 dim, 100 iters
+ROUTING_MODE=token SEED=0 bash run_all.sh      # full run on real data -> out_token_s0/ (needs internet; use a GPU)
+python eval/compare.py                         # results/comparison.csv and comparison.png from results/<run>/
 ```
 
-`run_all.sh` runs `prepare -> train -> sample -> plots -> ablate` and stops at the first error. You can pass options through environment variables: `ROUTED=1`, `DEVICE=cpu|cuda`, `PYTHON=python3`, `TRAIN_ARGS="--max_iters 2000"`, `PREP_ARGS="--force"`.
+`run_all.sh` runs `prepare -> train -> sample -> plots -> ablate -> routing plot` and stops at the first error. Environment variables:
+
+| Variable | Meaning |
+|---|---|
+| `ROUTING_MODE` | `dense` (default), `batch`, `token`, `label` |
+| `SEED` | Default 0. Controls model init and batch order. The dataset and validation sets stay fixed across seeds so runs are comparable |
+| `MAX_ITERS` | Overrides the config's `max_iters` |
+| `OUT_DIR`, `DATA_DIR` | Default `out_<mode>_s<seed>` and `data/out` |
+| `SMOKE=1` | Tiny synthetic run |
+| `DEVICE`, `PYTHON`, `TRAIN_ARGS`, `PREP_ARGS` | Device override, interpreter, and extra flags |
 
 ## Kaggle (T4)
 
-1. Push this repo to GitHub (public, or add your token to the URL).
-2. Upload `kaggle_run.ipynb` to Kaggle and set `REPO_URL` in the first cell.
-3. Settings: **Accelerator: GPU T4**, **Internet: On**. Click **Run All**.
-4. Results are written to `/kaggle/working/out/`, along with `run.log`. Set `ROUTED = True` in the first cell to train the routed model instead (outputs in `/kaggle/working/out_routed/`).
+1. Import `kaggle_run.ipynb` into Kaggle. It clones this repo's default branch.
+2. Settings: **Accelerator: GPU T4**, **Internet: On**.
+3. Set `ROUTING_MODE`, `SEED` and `MAX_ITERS` in the first cell, then **Run All**.
+4. Download `/kaggle/working/<mode>_s<seed>.zip` and unzip it into `results/<mode>_s<seed>/`.
 
-Expected wall time is about 20–30 min (see below). The notebook prints `DATA MODE: real` at the end. Any other value means the HuggingFace download failed and the run used the synthetic fallback.
+The notebook prints `DATA MODE: real` near the end. Any other value means the HuggingFace download failed and the run used the synthetic fallback. Each run takes well under an hour (see Runtime below), far below Kaggle's 12-hour limit.
 
 ## Files
 
@@ -100,11 +110,13 @@ Expected wall time is about 20–30 min (see below). The notebook prints `DATA M
 |---|---|
 | `data/prepare.py` | Builds the GPT-2-tokenized corpus in `data/out/`: `train.bin` (documents from all domains shuffled together), `train_domain.bin` (domain id per token: 0 story, 1 math, 2 code), `val_{story,math,code}.bin` (about 0.5M tokens each), and `meta.json`. If data matching the same arguments already exists, it skips the rebuild. |
 | `model/model.py` | The GPT. `set_ablation(layer, block)`, `set_block_mask(layer, mask)`, `clear_ablation()`, `record_block_norms(on)`, `get_block_norms()` |
-| `train.py` | Training loop with fp16 AMP and GradScaler on CUDA, fp32 on CPU, warmup plus cosine LR, eval on each domain, ETA printout, `--resume` |
-| `model/routing.py` | `GradientRouter`: activation-based gradient routing over MLP blocks (see Method). Only active with `--routing` |
-| `configs/baseline.py`, `configs/routed.py`, `configs/smoke.py` | Configs. Precedence: defaults < config file < CLI flags. `routed.py` = baseline + routing |
+| `train.py` | Training loop with fp16 AMP and GradScaler on CUDA, fp32 on CPU, warmup plus cosine LR, eval on each domain, ETA printout, tokens/sec in `metrics.csv`, `--resume` |
+| `model/routing.py` | `GradientRouter` (batch mode, v0) and `TokenRouter` (token and label modes, v1). See Method |
+| `configs/baseline.py`, `configs/routed.py`, `configs/smoke.py` | Configs. Precedence: defaults < config file < CLI flags. `routed.py` = baseline + batch mode. `run_all.sh` uses `baseline.py` plus `--routing_mode` |
 | `eval/sample.py` | `out/samples.txt`: 3 samples for each of 3 prompts |
 | `eval/plots.py` | `out/loss_curves.png` |
+| `eval/routing_plot.py` | `routing_by_domain.png`: per layer, the fraction of each domain's tokens selecting each block |
+| `eval/compare.py` | `results/comparison.csv` and `comparison.png`: final loss, mean S and speed per run, mean and std across seeds |
 | `eval/ablate.py` | `out/ablation.csv`, `ablation_heatmap.png`, `ablation_summary.txt`, `block_norms.csv`. Before the sweep it asserts that the mask actually changes the logits. |
 
 ### Data
@@ -118,7 +130,30 @@ For each block, damage on domain d is `loss_ablated[d] - loss_unablated[d]`. All
 
 ## Method: activation-based gradient routing
 
-With `--routing`, every training step decides, separately for each layer, which MLP blocks get to learn from the batch.
+There are four modes. `dense` is the baseline. `batch` is the original method (v0), kept unchanged. `token` is v1. `label` is an oracle baseline for v1. All modes use the same forward computation, so routing only changes which weights learn from what. Why v1 replaced v0 is in [`docs/findings.md`](docs/findings.md).
+
+### Token mode (v1)
+
+For every token $t$ in every layer:
+
+1. **Relative score.** $s(t,b) = \lVert h_b(t)\rVert_2 \,/\, \mathrm{EMA}_b$, where $\mathrm{EMA}_b$ is a running mean (decay 0.99, no gradient) of block $b$'s average energy. Scores measure how active a block is compared with its usual level, so a block cannot win just by being large.
+2. **Bias balancing** (as in DeepSeek-V3, with no auxiliary loss). Selection uses $s(t,b) + \mathrm{bias}_b$. After each step, $\mathrm{bias}_b$ goes down by $\gamma = 0.001$ if the block's fraction of selected tokens exceeded $k/n$, and up by $\gamma$ otherwise. The bias only affects selection.
+3. **Selection.** Each token keeps its top $k=2$ blocks, giving a per-token mask $m$.
+4. **Gradient masking on both projections.** The forward output must stay equal to the dense model, and neither projection may learn from unselected blocks:
+   $$h = \mathrm{gelu}(x W_\text{up}^\top),\quad h_\text{sel} = h \odot m,\quad h_\text{rest} = \mathrm{stopgrad}(h \odot (1-m)),$$
+   $$y = h_\text{sel} W_\text{down}^\top + h_\text{rest}\, \mathrm{stopgrad}(W_\text{down})^\top.$$
+   Masking $h$ alone would be wrong, since $W_\text{down}$ would still receive gradient from every block's activations (a test demonstrates this). This also stops gradient reaching earlier layers through unselected blocks, which v0 did not do.
+5. **Optimizer.** A block's $W_\text{up}$ rows or $W_\text{down}$ columns with exactly zero gradient on a step are left bit-identical: no update, no weight decay, and their Adam moments stay frozen.
+
+**What "per token" does and does not guarantee.** Attention lets a token's loss flow back through the earlier tokens it attends to. So a token's loss reaches exactly its own blocks in the last layer, but in earlier layers it reaches the union of the blocks selected by itself and the tokens before it. The tests check both statements.
+
+### Label mode (oracle baseline, Gradient Routing 2024 style)
+
+Same masking, with fixed masks taken from each token's domain label: story uses blocks 0-1, math 2-3, code 4-5, and blocks 6-7 are shared. Because of the attention effect above, a mixed window would let a math token's loss reach story blocks, so label mode trains on **domain-pure windows** (`common.PureWindowSampler`), with windows drawn per domain in proportion to its share of training tokens. This is the only mode that samples differently. Token mode uses labels for logging only, and a test confirms that scrambling them leaves its weights unchanged.
+
+### Batch mode (v0)
+
+Every training step decides, separately for each layer, which MLP blocks get to learn from the whole micro-batch. `--routing` still means this mode.
 
 Let $h_{l,b}(t) \in \mathbb{R}^{d/n}$ be the post-GELU hidden activation of block $b$ in layer $l$ at token $t$, where $n=8$ blocks and $d = 4\,n_\text{embd}$.
 
@@ -129,17 +164,17 @@ Let $h_{l,b}(t) \in \mathbb{R}^{d/n}$ be the post-GELU hidden activation of bloc
    $$\mathcal{L} = \mathcal{L}_\text{LM} + \lambda \sum_{l,b} f_{l,b}\, p_{l,b}, \qquad \lambda = 0.01.$$
    $f$ is treated as a constant. The aux gradient lowers the energy share of blocks that are selected often and raises it for blocks that are selected rarely. At uniform balance the aux term equals $\lambda\, n_\text{layer}\, k/n$.
 
-**Why the aux gradient bypasses the mask (`route_mask_aux=False`, the default).** In the default mode, $a_{l,b}$ for the aux term is recomputed on a side graph from `x.detach()`, so its gradient reaches only that layer's `c_fc` rows, and it is not masked. This is the same role the balancing loss plays for an MoE router.
+**Why the aux gradient bypasses the mask in batch mode (`route_mask_aux=False`, the default).** In the default mode, $a_{l,b}$ for the aux term is recomputed on a side graph from `x.detach()`, so its gradient reaches only that layer's `c_fc` rows, and it is not masked. This is the same role the balancing loss plays for an MoE router.
 
 If the aux gradient is masked as well (`--route_mask_aux`), training collapses. A block that loses selection gets no gradient that could make it win again, so routing locks onto a fixed $k$ blocks per layer (the likely role of AdamW weight decay in shrinking idle blocks was not isolated). In the 100-iteration smoke run at $\lambda=0.01$, 9 of 16 blocks were never selected. Over 300 iterations, 12 of 16 were idle in the last 50 iterations (exactly $k$ alive per layer). Even $\lambda=1$ left 6 of 16 idle. Details in [`docs/findings.md`](docs/findings.md). `tests/test_routing.py::test_literal_masking_lets_blocks_die` records this behaviour.
 
 In the default mode, idle blocks keep receiving balancing gradient and do come back into selection. In the CPU smoke test one block per layer tended to win a slot on most steps. At full scale on the T4 selection was much more balanced (see "Block selection during routed training" under Results so far).
 
-**Caveat.** A block whose gradient is zeroed still moves slightly under AdamW: its momentum carries on for a few steps, and weight decay keeps applying. Routing controls what each block learns *from*, not whether its weights stay frozen.
+**Caveat (batch mode only).** A block whose gradient is zeroed still moves slightly under AdamW: its momentum carries on for a few steps, and weight decay keeps applying. Routing controls what each block learns *from*, not whether its weights stay frozen.
 
-`out_routed/routing_stats.csv` logs, at every eval, `freq_ema`, the cumulative `selected_count` / `selected_frac`, and the last `energy` for each (layer, block).
+`routing_stats.csv` logs, at every eval and for each (layer, block), `frac_story`, `frac_math` and `frac_code`: the fraction of that domain's tokens that selected the block since the previous eval. Batch mode also logs `freq_ema`, `selected_count`, `selected_frac` and `energy`; token and label modes log `frac_all`, `cum_frac_all`, `bias` and `ema`. Old v0 result files do not have the `frac_*` columns.
 
-Tests (`python -m pytest tests/`) check the following:
+The v0 tests (`tests/test_routing.py`) check the following; the v1 tests are in `tests/test_routing_v1.py`:
 - (a) Only the top-$k$ blocks per layer receive MLP gradient. This holds for the total gradient with `mask_aux`, and for the task gradient in the default mode. In the default mode, non-selected blocks receive exactly the aux gradient and nothing else.
 - (b) With routing off, gradients are dense, and `router.remove()` restores dense gradients bit-for-bit.
 - (c) After 100 smoke iterations, no block is dead: every block has been selected, and every currently unselected block still receives gradient.
@@ -158,4 +193,4 @@ Measured on the dense baseline run (Kaggle T4, `results/dense_v0/run.log`):
 
 The total is inside the 20-30 minute range I had estimated, but training took longer than my earlier 10-15 minute estimate. `train.py` prints a measured ETA every 50 iterations, which includes eval and checkpoint overhead.
 
-A routed run costs a little more per iteration, since it re-runs each layer's `c_fc` on detached inputs and does a second, small backward pass for the aux loss. Measured on the T4: training 20 min 51 s (+7%), whole pipeline 25 min 29 s.
+Batch mode measured on the T4: training 20 min 51 s (+7%), whole pipeline 25 min 29 s. Token and label modes have not run on a GPU. On CPU their overhead was within noise, so the estimate is 25-35 minutes per full pipeline, far below the 12-hour session limit.

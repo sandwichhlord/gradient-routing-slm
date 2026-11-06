@@ -1,55 +1,60 @@
 # Roadmap
 
-**Research question:** does routing gradients by each block's own activation energy produce domain-specialised, ablatable MLP blocks without domain labels?
-
-Compute figures below are estimates from the T4 numbers in the README (about 20-30 min per full run). None of them has been measured on a GPU yet.
+**Research question:** can a model organise its own domain-specialised, ablatable MLP blocks during training, with no domain labels?
 
 ## Done
 
-- Data pipeline for three domains (stories, math, code) with per-domain validation sets and a per-token domain id file (`data/out/train_domain.bin`).
+- Data pipeline for three domains with per-domain validation sets and a per-token domain id file (`train_domain.bin`).
 - Dense baseline GPT with the MLP split into 8 blocks, an ablation mask and activation-norm recording.
 - Training with fp16 on a T4, sampling, loss curves, and the ablation matrix with specialization score S.
-- Activation-based gradient routing (`model/routing.py`, `--routing`) with tests.
-- One full-scale dense run and one full-scale routed run on the T4 (same seed). Routed mean S = 0.110 against 0.051 for dense, at a 3-7% loss cost. See the README and `findings.md`.
+- Routing v0 (`batch` mode), with one full-scale dense run and one full-scale routed run on the T4 at seed 1337. Routed mean S was 0.110 against 0.051 for dense, at a 3-7% loss cost. Tag `v0-batch-routing` marks this code.
+- Routing v1 (`token` mode) and the oracle baseline (`label` mode), tested on CPU only. Per-domain routing logs, `eval/routing_plot.py`, `eval/compare.py`, and seeds through `SEED`.
 
 ## Remaining, in order
 
-### 1. Full dense and routed runs: done once, one seed each
-- Result: routed S 0.110 vs dense 0.051, loss cost 3-7%, balanced selection with no dead blocks (the smoke-test dominance did not carry over, apart from layer 0 block 6).
-- **What this does not settle:** one seed per arm, so the S difference may be run-to-run variation. Also, ablation damage grew about 10x in the routed model, so higher S may partly mean "blocks became more critical" and not only "more domain-specific". That is why seeds (task 6) and probes (task 4) now come next.
-- **Still open:** a small sweep over lambda in {0.01, 0.1, 1} and k in {1, 2, 3} on shortened runs (1000 iterations). It is cheap, and it shows how much of the effect depends on these settings.
-- **Success criterion (to agree on):** routed S clearly above dense S across seeds, at similar validation loss.
+### 1. Full-scale runs on the T4 (next)
 
-### 2. Hard label-routing baseline
-- Route by the known domain label, as in Gradient Routing: a fixed set of blocks per domain (for example 3 / 3 / 2 blocks, or one shared block). This is the label-supervised upper bound for specialisation.
-- **Design decision:** our training batches are random windows of a mixed stream, so one window can span documents from different domains. Per-sequence label masks need domain-pure batches. Plan: draw each micro-batch from a single domain and cycle through the domains with gradient accumulation. Dense and routed runs keep their current sampling.
-- Add `--routing label` to `train.py`, reusing the hooks in `GradientRouter` with a fixed mask per micro-batch. Tests: each domain's gradient reaches only its own blocks.
-- **Cost:** about half a day of work, then one run.
+Run these in order, one Kaggle session each, using `ROUTING_MODE` and `SEED` in the notebook's first cell:
 
-### 3. Consolidation
-- **Not yet defined, so this needs your decision.** My working definition: after the routing phase, freeze (or lower the learning rate of) the blocks that have become specialised (high per-block S), then continue training so that general capacity can still absorb new data. A second reading is "initialise the routed run from the dense checkpoint" (the dashed edge in `architecture.md`).
-- Start with the second reading because it needs no new mechanism, only a `--init_from` flag. Compare routed-from-scratch against routed-from-dense.
+| Order | Mode | Seed | Why now |
+|---|---|---|---|
+| 1 | `token` | 0 | The first real test of v1. If it collapses or does not learn, stop and fix it before spending more GPU time |
+| 2 | `dense` | 0 | The comparison point on the new seed scheme |
+| 3 | `label` | 0 | The upper bound: how much S is possible with labels |
+| 4-7 | `token`, `dense`, `label`, `batch` | 1 | Second seed |
+| 8-11 | `token`, `dense`, `label`, `batch` | 2 | Third seed. Without several seeds, S gaps between modes cannot be trusted |
+| 12 | `batch` | 0 | Completes seed 0. Lowest priority, since a v0 run at seed 1337 already exists |
 
-### 4. Domain probes
-- Train linear probes that predict the domain of a token window from each block's activations (use the existing activation hooks), per layer and block.
-- Compare dense, routed and label-routed. Probe accuracy shows whether a block encodes domain information even when ablating it does little damage.
-- Control: probe on shuffled labels, and the same probes on a randomly initialised model.
-- **Cost:** one script, minutes to run.
+Unzip each result into `results/<mode>_s<seed>/`, then run `python eval/compare.py`.
+
+**Check first on the token run:**
+- `routing_by_domain.png`: do domains select different blocks? If the three rows of each layer look the same, routing is not separating domains, whatever S says.
+- `frac_all` in `routing_stats.csv`: is selection stable, or does it swing between blocks? The smoke runs showed bursts.
+- The bias range: if it grows much larger than the spread of the scores, the bias is deciding selection and not the tokens.
+
+**Success criterion (to agree on):** token S clearly above dense S across seeds, per-domain selection visibly different, and label S above token S, at a validation loss within a few percent of dense.
+
+### 2. Tune v1 if needed
+A small sweep of `route_gamma` and `route_k` on shortened runs (`MAX_ITERS=1000`) is cheap. Only do this after the first token run shows what needs fixing.
+
+### 3. Domain probes
+- Train linear probes that predict the domain from each block's activations, per layer and block, using the existing activation hooks.
+- Compare dense, token and label. Probe accuracy shows whether a block encodes domain information even when ablating it does little damage, which also helps with the S confound below.
+- Controls: shuffled labels, and a randomly initialised model.
+
+### 4. Consolidation
+**Not yet defined, so this needs your decision.** Working definition: after the routing phase, freeze or slow down the blocks that have become specialised, then keep training so that general capacity can absorb new data. A simpler reading is to initialise the routed run from the dense checkpoint, which only needs an `--init_from` flag. I would start with the simpler one.
 
 ### 5. Unlearning and continual-learning experiments
-- **Unlearning:** ablate the blocks that matter most for domain X, then measure the loss increase on X against the other domains. Then run a relearning attack (a short fine-tune on X) and measure how quickly X comes back, for dense, routed and label-routed models. This follows the Gradient Routing evaluation.
-- **Continual learning:** train on domains in sequence (stories, then math, then code). Measure forgetting of earlier domains for dense, routed, and dense with EWC (Fisher penalty, as in Kirkpatrick et al.). EWC has to be implemented (`eval/` or `train.py --ewc`).
-- **Cost:** a few hours of work plus roughly 2-3 extra runs per arm.
-
-### 6. Multi-seed runs (do this before tasks 2-5; everything else depends on it)
-- At least 3 seeds per arm (dense, routed, label-routed, plus EWC where relevant), reporting mean and standard deviation. Without this, S differences between arms cannot be trusted. The full-scale dense and routed runs gave mean S 0.051 and 0.110 on one seed each. Without seeds we cannot say whether that gap is larger than run-to-run variation.
-- The `--seed` flag exists. Data preparation uses its own seed, so keep the data fixed across seeds unless data variance is also being measured.
-- **Cost:** roughly 4 arms x 3 seeds x about 25 min = 5 hours of GPU time, spread over several Kaggle sessions. Check the weekly GPU quota first.
-- Add a small aggregation script that reads the `out*/` folders and produces one table and plot.
+- **Unlearning:** ablate the blocks that matter most for domain X, then measure the loss increase on X against the other domains. Then run a relearning attack (a short fine-tune on X) and measure how quickly X comes back, for dense, token and label models. This follows the Gradient Routing evaluation.
+- **Continual learning:** train on domains in sequence. Measure forgetting of earlier domains for dense, token, and dense with EWC (EWC has to be implemented).
 
 ## Risks and open questions
 
-- **Block dominance.** At full scale selection was balanced except for layer 0 block 6 (70% of steps). Measure S with that block excluded to check it does not drive the result.
-- **S is noisy** when ablation damage is tiny (blocks with near-zero damage have an unstable S). Report damage-weighted S alongside the plain mean, and use more evaluation batches than the default 20.
-- **Scale.** About 10M non-embedding parameters on 40M tokens is small. Results may not carry over to larger models, so say so in any write-up.
-- **Evaluation noise from synthetic math.** Math loss depends on the generator's number distribution, so only compare it between runs that use the same data.
+- **S confound.** S compares shares of damage, so it cannot tell "more domain-specific" from "more critical overall". In v0, ablation damage grew about 10x. `eval/compare.py` reports `mean_damage` next to S for this reason.
+- **Mixed windows in token mode.** Token mode trains on the same mixed windows as dense and batch, so a token's loss also reaches the blocks of earlier tokens from other domains through attention. Label mode avoids this with pure windows. If token mode's domain separation is weak, trying pure windows there is a cheap experiment.
+- **Label mode samples differently.** Pure windows never cross a domain boundary, and they cover some tokens less (on a real-data sample: 62% of story, 29% of math and 89% of code tokens can start a pure window). Keep this in mind when comparing its losses with the other modes.
+- **Selection may not be token-specific.** With a small gamma, selection can swing as a group between blocks. This is the first thing to check in the token run.
+- **S is noisy** when ablation damage is tiny. Report damage-weighted S alongside the plain mean if it matters, and consider more than the default 20 evaluation batches.
+- **Scale.** About 10M non-embedding parameters on 40M tokens is small. Results may not carry over to larger models.
+- **fp16 is untested locally.** The new paths ran on CPU, including bf16 autocast, but the first GPU run is the first real fp16 test. The token run is first in the order partly for this reason.
