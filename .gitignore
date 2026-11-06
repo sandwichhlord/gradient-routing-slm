@@ -1,6 +1,6 @@
 data/out/
-out_routed/
 out/
+out_*/
 *.pt
 *.pt.tmp
 __pycache__/

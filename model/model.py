@@ -66,6 +66,8 @@ class BlockMLP(nn.Module):
         self.capture_energy = False     # in training mode, keep differentiable per-block energy (routing)
         self.energy = None              # (n_blocks,) mean over tokens of ||h_b||_2, set by forward
         self.energy_detach_input = False  # compute energy on a side graph from x.detach() (routing's default)
+        self.token_router = None        # per-token routing (token / label modes), see model/routing.py
+        self.layer_idx = 0
         self.reset_norms()
 
     def reset_norms(self):
@@ -76,8 +78,19 @@ class BlockMLP(nn.Module):
         """(n_blocks,) mean over tokens of each block's L2 norm."""
         return h.float().view(*h.shape[:-1], self.n_blocks, self.block_dim).norm(dim=-1).reshape(-1, self.n_blocks).mean(0)
 
+    def _token_routed_output(self, h):
+        """Same output as the dense path, but gradient only reaches each token's selected blocks: c_fc rows and
+        upstream layers through h_sel, c_proj columns through the first term (the second uses detached weights)."""
+        hb = h.view(*h.shape[:-1], self.n_blocks, self.block_dim)
+        m = self.token_router.select(self.layer_idx, hb.detach()).to(h.dtype).unsqueeze(-1)
+        h_sel = (hb * m).view(h.shape)
+        h_rest = (hb.detach() * (1.0 - m)).view(h.shape)
+        return F.linear(h_sel, self.c_proj.weight, self.c_proj.bias) + F.linear(h_rest, self.c_proj.weight.detach())
+
     def forward(self, x):
         h = self.gelu(self.c_fc(x))
+        if self.token_router is not None and self.training and torch.is_grad_enabled():
+            return self.dropout(self._token_routed_output(h))
         capture = self.capture_energy and self.training
         if capture and self.energy_detach_input:
             # separate graph whose only parameters are this layer's c_fc (so its gradient can bypass routing masks)
