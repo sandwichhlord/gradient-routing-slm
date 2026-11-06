@@ -1,0 +1,62 @@
+# samples from checkpoint @ iter 5000 (temperature=0.8, top_k=200, max_new_tokens=120)
+
+=== prompt: 'Once upon a time' | sample 1 ===
+Once upon a time, there was a little girl who loved to play for so his toy in the house. She was scared and happy and she was so curious. "It's very special and had an old little girl. It's a little girl, but the nextay?" She ran to the store, but they knew it didn't like to play with the park's room and she had a big big smile. It was a hat. On the top of the corner and the sun.
+
+After many y old flowers and tree felt too and ran to the window and asked her mom. They walked to a
+
+=== prompt: 'Once upon a time' | sample 2 ===
+Once upon a time there there a little yellow fun adventure were having a great little boy outside. The boy had a very fun to watch the door. He had a soft of animals and people. 
+
+The next day, he saw a cat was very happy and. 
+
+The boy had a big, started to cry. 
+
+Tim thought the cat was so scared. Tom heard his mom ran home and saw wings and put all on the bench, but he was warm and found the sun. His mom felt angry. The fence smiled and said. He had so very surprised and wouldn't go
+
+=== prompt: 'Once upon a time' | sample 3 ===
+Once upon a time he was so sleepy! He saw a big stick around and and he could try. He was so excited and he was very happy.. 
+
+As he stopped had a big, the lion with his friends, he could not be it. Timmy was so happy to help and he decided to follow the face. 
+
+He was so excited when he got tired and, Timmy said, "But you have a beautiful game," Timmy was amazed. 
+
+Timmy was glad he didn't want to be careful and he made the big loud house of his mommy
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 1 ===
+Q: 37 + 48 = A: 71
+Q: 6 x 98 = A: 7759
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 2 ===
+Q: 37 + 48 = A: 4
+Q: 12 + 6 = A: 66
+Q: 53 - 7 = A: 40
+Q: 7 x 0 = A: 0
+Q: 1 + 1 = A: 5
+Q: 6 x 6 = A: 30
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 3 ===
+Q: 37 + 48 = A: 128
+Q: 26 - 5 = A: 6
+Q: 521 x 6 = A: 945
+Q: 4 + 9 = A: 15
+Q: 8 - 4 = A: 803
+Q: 5 + 0 = A: 0
+Q: 47 + 7 = A: 72
+Q: 0 - 737 = A: -6
+Q: 0 x 784 = A: -14
+Q: 1 + 993 = A: 8758
+Q: 1 x 539 = A: 3464
+Q: 824 + 0 =
+
+=== prompt: 'def add(a, b):' | sample 1 ===
+def add(a, b):
+                                                self.                                                                      
+
+=== prompt: 'def add(a, b):' | sample 2 ===
+def add(a, b):
+                                                                                                                      # *
+
+=== prompt: 'def add(a, b):' | sample 3 ===
+def add(a, b): #                                                                             self    for i_type_string___file_name']_count(self._name):
+                  

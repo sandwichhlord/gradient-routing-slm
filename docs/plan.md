@@ -1,6 +1,6 @@
 # Roadmap
 
-**Research question:** can a model organise its own domain-specialised, ablatable MLP blocks during training, with no domain labels?
+**Research question:** can a model organise its own domain-specialised, ablatable groups of neurons during training, with no domain labels?
 
 ## Done
 
@@ -8,46 +8,48 @@
 - Dense baseline GPT with the MLP split into 8 blocks, an ablation mask and activation-norm recording.
 - Training with fp16 on a T4, sampling, loss curves, and the ablation matrix with specialization score S.
 - Routing v0 (`batch` mode), with one full-scale dense run and one full-scale routed run on the T4 at seed 1337. Routed mean S was 0.110 against 0.051 for dense, at a 3-7% loss cost. Tag `v0-batch-routing` marks this code.
-- Routing v1 (`token` mode) and the oracle baseline (`label` mode), tested on CPU only. Per-domain routing logs, `eval/routing_plot.py`, `eval/compare.py`, and seeds through `SEED`.
+- Routing v1 (`token` mode) and the oracle baseline (`label` mode). Per-domain routing logs, `eval/routing_plot.py`, `eval/compare.py`, and seeds through `SEED`. One full token run, which failed its health check.
+- Routing v2 (`assembly` mode), its evaluation (`eval/ablate_assemblies.py`, `eval/assembly_probe.py`) and health checks, tested on CPU only.
 
 ## Remaining, in order
 
-### 1. Full-scale runs on the T4 (next)
+### 1. Assembly runs on the T4 (next)
 
-Run these in order, one Kaggle session each, using `ROUTING_MODE` and `SEED` in the notebook's first cell:
+Set these in the notebook's first cell. Unzip each result into `results/<zip name>/`, then run `python eval/compare.py`.
 
-| Order | Mode | Seed | Why now |
+| Order | Run | Notebook settings | Estimated time |
 |---|---|---|---|
-| 1 | `token` | 0 | The first real test of v1. If it collapses or does not learn, stop and fix it before spending more GPU time |
-| 2 | `dense` | 0 | The comparison point on the new seed scheme |
-| 3 | `label` | 0 | The upper bound: how much S is possible with labels |
-| 4-7 | `token`, `dense`, `label`, `batch` | 1 | Second seed |
-| 8-11 | `token`, `dense`, `label`, `batch` | 2 | Third seed. Without several seeds, S gaps between modes cannot be trusted |
-| 12 | `batch` | 0 | Completes seed 0. Lowest priority, since a v0 run at seed 1337 already exists |
+| 1 | `dense_s0` with the post-hoc control | `ROUTING_MODE="dense"`, `POSTHOC=True` | about 50 min |
+| 2 | `assembly_s0` | `ROUTING_MODE="assembly"`, `POSTHOC=False` | about 50 min |
+| 3 | If healthy: `assembly_r0.5_s0`, `assembly_r2.0_s0` | `RESOLUTION=0.5`, then `RESOLUTION=2.0` | about 50 min and 60-90 min |
+| 4 | 3 seeds of dense and assembly | `SEED=1`, then `SEED=2`, for each | about 50 min each |
+| 5 | Unlearning and continual learning | See task 4 | |
+| 6 | Consolidation | See task 5 | |
 
-Unzip each result into `results/<mode>_s<seed>/`, then run `python eval/compare.py`.
+Run 1 does both steps of "dense_s0, then post-hoc on dense_s0" in one session. Post hoc can also run alone on an uploaded checkpoint with `POSTHOC_CKPT`. An optional extra control after `assembly_s0` is a dense run with `LR_SCALE` set from its `summary.txt` (see the Adam concern in `findings.md`, section 8).
 
-**Check first on the token run:**
-- `routing_by_domain.png`: do domains select different blocks? If the three rows of each layer look the same, routing is not separating domains, whatever S says.
-- `frac_all` in `routing_stats.csv`: is selection stable, or does it swing between blocks? The smoke runs showed bursts.
-- The bias range: if it grows much larger than the spread of the scores, the bias is deciding selection and not the tokens.
+**Check on `assembly_s0` before going further, in order:**
+1. `metrics.csv`: loss falling smoothly, no NaN, and `act_norm_l*` near the dense values (`token_s0` reached about 180 against about 4).
+2. `assemblies.csv`: no `degenerate` flags, and ARI rising over training. `assembly_health.png` shows both.
+3. `assembly_summary.txt`: real S above the random baseline, and above `dense_s0/posthoc`.
+4. `assembly_domain_profile.csv` and `assembly_probe.csv`: do assemblies respond to domains, or only to frequent tokens?
 
-**Success criterion (to agree on):** token S clearly above dense S across seeds, per-domain selection visibly different, and label S above token S, at a validation loss within a few percent of dense.
+**Success criterion (to agree on):** assembly S clearly above the dense post-hoc S across seeds, at a validation loss within a few percent of dense, with no blow-up.
 
-### 2. Tune v1 if needed
-A small sweep of `route_gamma` and `route_k` on shortened runs (`MAX_ITERS=1000`) is cheap. Only do this after the first token run shows what needs fixing.
+### 2. Older modes
+`token_s0` failed its health check (`findings.md`, section 6) and further token seeds are on hold. `label_s0` was not run, so the cause of that failure is not separated. It would still answer that question if it becomes relevant, and it remains the oracle baseline for any later comparison.
 
 ### 3. Domain probes
 - Train linear probes that predict the domain from each block's activations, per layer and block, using the existing activation hooks.
-- Compare dense, token and label. Probe accuracy shows whether a block encodes domain information even when ablating it does little damage, which also helps with the S confound below.
+- Compare dense, assembly and label. Probe accuracy shows whether a block encodes domain information even when ablating it does little damage, which also helps with the S confound below.
 - Controls: shuffled labels, and a randomly initialised model.
 
-### 4. Consolidation
-**Not yet defined, so this needs your decision.** Working definition: after the routing phase, freeze or slow down the blocks that have become specialised, then keep training so that general capacity can absorb new data. A simpler reading is to initialise the routed run from the dense checkpoint, which only needs an `--init_from` flag. I would start with the simpler one.
-
-### 5. Unlearning and continual-learning experiments
+### 4. Unlearning and continual-learning experiments
 - **Unlearning:** ablate the blocks that matter most for domain X, then measure the loss increase on X against the other domains. Then run a relearning attack (a short fine-tune on X) and measure how quickly X comes back, for dense, token and label models. This follows the Gradient Routing evaluation.
 - **Continual learning:** train on domains in sequence. Measure forgetting of earlier domains for dense, token, and dense with EWC (EWC has to be implemented).
+
+### 5. Consolidation (last)
+Consolidation means groups hardening as they mature, to reduce forgetting. Starting a routed run from the dense checkpoint is a different idea and is not what this item means. `--consolidate` exists but is off by default, and Adam probably cancels it as implemented (`findings.md`, section 8), so it needs rethinking before use.
 
 ## Risks and open questions
 

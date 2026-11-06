@@ -3,10 +3,12 @@
 A run is any folder holding metrics.csv. Folders named <group>_s<seed> or <group>_<n> are grouped, and a group's rows
 report mean and std across its runs. Mean S is the mean of the `specialization` column of ablation.csv, the number
 eval/ablate.py reports. tokens_per_sec is the median over the run; old runs did not log it, so it is taken from the
-median ms/it in run.log.
+median ms/it in run.log. The asm_* columns come from eval/ablate_assemblies.py (assembly_summary.json in the run folder)
+and the posthoc_* columns from its post-hoc mode (posthoc/assembly_summary.json).
 """
 import argparse
 import csv
+import json
 import os
 import re
 import statistics
@@ -25,7 +27,9 @@ INK, MUTED, GRID = "#0b0b0b", "#898781", "#e1e0d9"
 COLORS = {"story": "#2a78d6", "math": "#eb6834", "code": "#1baf7a"}
 NEUTRAL = "#52514e"
 ORDER = ["dense_v0", "v0_batch_routing", "dense", "batch", "token", "label"]
-METRICS = [*[f"val_{d}" for d in DOMAINS], "mean_S", "mean_damage", "tokens_per_sec"]
+ASM_FIELDS = ["mean_S", "random_mean_S", "size_weighted_S", "damage_weighted_S", "n_assemblies"]
+METRICS = [*[f"val_{d}" for d in DOMAINS], "mean_S", "mean_damage", "tokens_per_sec",
+           *[f"asm_{f}" for f in ASM_FIELDS], *[f"posthoc_{f}" for f in ASM_FIELDS]]
 
 
 def group_of(run):
@@ -58,6 +62,14 @@ def read_run(folder):
     out["final_iter"] = int(rows[-1]["iter"])
     out["tokens_per_sec"] = read_tokens_per_sec(folder, rows)
     out["mean_S"] = out["mean_damage"] = None
+    for prefix, path in (("asm", "assembly_summary.json"), ("posthoc", os.path.join("posthoc", "assembly_summary.json"))):
+        summary_path = os.path.join(folder, path)
+        found = {}
+        if os.path.exists(summary_path):
+            with open(summary_path) as f:
+                found = json.load(f)
+        for field in ASM_FIELDS:
+            out[f"{prefix}_{field}"] = found.get(field)
     abl = os.path.join(folder, "ablation.csv")
     if os.path.exists(abl):
         with open(abl, newline="") as f:

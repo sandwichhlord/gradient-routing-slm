@@ -15,3 +15,7 @@ eval_interval = 25
 eval_iters = 4
 log_interval = 10
 ckpt_interval = 50
+
+# assembly mode: cluster early so a 100-iter run exercises it
+cluster_start = 30
+cluster_every = 30

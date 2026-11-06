@@ -67,6 +67,8 @@ class BlockMLP(nn.Module):
         self.energy = None              # (n_blocks,) mean over tokens of ||h_b||_2, set by forward
         self.energy_detach_input = False  # compute energy on a side graph from x.detach() (routing's default)
         self.token_router = None        # per-token routing (token / label modes), see model/routing.py
+        self.assembly_router = None     # graded plasticity (assembly mode), see model/assemblies.py
+        self.neuron_mask = None         # None or float tensor (hidden,): inference-time ablation of any neuron set
         self.layer_idx = 0
         self.reset_norms()
 
@@ -91,6 +93,15 @@ class BlockMLP(nn.Module):
         h = self.gelu(self.c_fc(x))
         if self.token_router is not None and self.training and torch.is_grad_enabled():
             return self.dropout(self._token_routed_output(h))
+        if self.assembly_router is not None and self.training and torch.is_grad_enabled():
+            P = self.assembly_router.plasticity(self.layer_idx, h.detach())
+            if P is not None:
+                # same output as the dense path; gradient to W_up, W_down and upstream layers is scaled by P per token
+                P = P.to(h.dtype)
+                return self.dropout(F.linear(h * P, self.c_proj.weight, self.c_proj.bias)
+                                    + F.linear(h.detach() * (1.0 - P), self.c_proj.weight.detach()))
+        if self.neuron_mask is not None:
+            h = h * self.neuron_mask.to(device=h.device, dtype=h.dtype)
         capture = self.capture_energy and self.training
         if capture and self.energy_detach_input:
             # separate graph whose only parameters are this layer's c_fc (so its gradient can bypass routing masks)
@@ -183,9 +194,15 @@ class GPT(nn.Module):
         mask[block] = 0.0
         self.set_block_mask(layer, mask)
 
+    def set_neuron_mask(self, layer, mask):
+        """Ablate an arbitrary set of hidden neurons in one layer (and clear every other mask)."""
+        self.clear_ablation()
+        self.mlps()[layer].neuron_mask = torch.as_tensor(mask, dtype=torch.float32)
+
     def clear_ablation(self):
         for m in self.mlps():
             m.block_mask = None
+            m.neuron_mask = None
 
     def record_block_norms(self, on=True):
         for m in self.mlps():

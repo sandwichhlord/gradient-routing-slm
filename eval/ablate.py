@@ -65,7 +65,8 @@ def check_mask_works(model, val, block_size, device):
           f"all-ones mask and clear_ablation() reproduce the dense model")
 
 
-def plot_heatmap(names, dmg, out_path, base):
+def plot_heatmap(names, dmg, out_path, base, title="Loss increase when one MLP block is zeroed",
+                 ylabel="ablated MLP block (layer.block)"):
     L = float(np.nanmax(np.abs(dmg))) or 1e-6
     fig_h = max(3.0, 0.24 * len(names) + 1.6)
     fig, ax = plt.subplots(figsize=(5.2, fig_h), dpi=150)
@@ -73,8 +74,8 @@ def plot_heatmap(names, dmg, out_path, base):
     ax.set_xticks(range(len(DOMAINS)), [f"{d}\n(base {base[d]:.2f})" for d in DOMAINS], fontsize=8, color=INK)
     ax.set_yticks(range(len(names)), names, fontsize=6 if len(names) > 24 else 8, color=INK)
     ax.set_xlabel("validation domain", color=INK)
-    ax.set_ylabel("ablated MLP block (layer.block)", color=INK)
-    ax.set_title("Loss increase when one MLP block is zeroed", color=INK, fontsize=10, loc="left")
+    ax.set_ylabel(ylabel, color=INK)
+    ax.set_title(title, color=INK, fontsize=10, loc="left")
     # thin surface-coloured gaps between cells
     ax.set_xticks(np.arange(-0.5, len(DOMAINS), 1), minor=True)
     ax.set_yticks(np.arange(-0.5, len(names), 1), minor=True)

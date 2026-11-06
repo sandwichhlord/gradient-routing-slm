@@ -78,3 +78,14 @@ Neither run was partial or failed: both have a checkpoint at iter 5000 and a log
 - Outputs go to `out_<mode>_s<seed>/`. Put downloaded results in `results/<mode>_s<seed>/`, then run `python eval/compare.py`.
 - `python -m pytest tests/`: 41 tests, about 10 minutes on CPU.
 - **Token and label modes have only run on CPU.** No full-scale v1 result exists yet. See `docs/findings.md` and `docs/plan.md`.
+
+## Update: routing v2 (assembly mode)
+
+- `token_s0` ran on the T4 and failed its health check (`docs/findings.md`, section 6): domains separated in early layers, but activations blew up and the loss was 32-72% above dense. It is in `results/token_s0/`.
+- **We pivoted to `ROUTING_MODE=assembly`.** Neuron groups form from co-activation and learn with graded plasticity. It has only run on CPU, so no full-scale result exists yet.
+- All older modes still work and are baselines.
+- New tools: `eval/ablate_assemblies.py` (works on any checkpoint, including a post-hoc run on a dense one, which is the key control), `eval/assembly_probe.py`, `eval/assembly_health_plot.py`.
+- New dependencies: `igraph`, `leidenalg`, `scipy`. The notebook installs them.
+- Run order is in `docs/plan.md`. The reviewer-concerns list is in `docs/findings.md`, section 8.
+- Tests: `python -m pytest tests/`, about 15-20 minutes on CPU.
+
