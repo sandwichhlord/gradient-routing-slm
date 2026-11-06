@@ -15,7 +15,7 @@ The MLP hidden layer in every transformer layer is split into `n_blocks` (8) equ
 
 ## Results so far
 
-Dense baseline and one gradient-routed run (top-2 of 8 blocks per layer, lambda 0.01, hard masking), same seed, same data, same config otherwise. Kaggle T4, fp16, 5000 iterations, 10.6M non-embedding parameters (29.9M with the tied embedding). Raw files are in [`results/baseline/`](results/baseline/) and [`results/routed/`](results/routed/). **Each number comes from one seed**, so differences between the two runs have no error bars yet.
+Dense baseline and one gradient-routed run (top-2 of 8 blocks per layer, lambda 0.01, hard masking), same seed, same data, same config otherwise. Kaggle T4, fp16, 5000 iterations, 10.6M non-embedding parameters (29.9M with the tied embedding). Raw files are in [`results/dense_v0/`](results/dense_v0/) and [`results/v0_batch_routing/`](results/v0_batch_routing/). **Each number comes from one seed**, so differences between the two runs have no error bars yet.
 
 ### Validation loss and cost of routing
 
@@ -32,7 +32,7 @@ Math loss is not a measure of arithmetic skill: the operand digits are random an
 
 | Dense | Routed |
 |---|---|
-| ![Dense loss curves](results/baseline/loss_curves.png) | ![Routed loss curves](results/routed/loss_curves.png) |
+| ![Dense loss curves](results/dense_v0/loss_curves.png) | ![Routed loss curves](results/v0_batch_routing/loss_curves.png) |
 
 ### Specialization (ablating one MLP block at a time, all 48 blocks)
 
@@ -48,13 +48,13 @@ Math loss is not a measure of arithmetic skill: the operand digits are random an
 
 | Dense | Routed |
 |---|---|
-| ![Dense ablation heatmap](results/baseline/ablation_heatmap.png) | ![Routed ablation heatmap](results/routed/ablation_heatmap.png) |
+| ![Dense ablation heatmap](results/dense_v0/ablation_heatmap.png) | ![Routed ablation heatmap](results/v0_batch_routing/ablation_heatmap.png) |
 
 Note the colour scales differ: the dense heatmap tops out at 0.1 nats, the routed one at 1.5.
 
 ### Block selection during routed training
 
-Frequencies come from `results/routed/routing_stats.csv`. Uniform would be 0.25 (k/n).
+Frequencies come from `results/v0_batch_routing/routing_stats.csv`. Uniform would be 0.25 (k/n).
 
 - **No dead blocks.** Every block was selected at least 14.7% of the time over the whole run, and none was selected in fewer than 5% of the iterations in the last 1000.
 - **Mostly balanced.** Over the whole run, 47 of the 48 blocks were selected 15%-31% of the time. The exception is layer 0, block 6, selected 70% of the time overall (39% in the last 1000 iterations).
@@ -63,7 +63,7 @@ Frequencies come from `results/routed/routing_stats.csv`. Uniform would be 0.25 
 
 ### Samples
 
-Checkpoints at iteration 5000, temperature 0.8; full sets in `results/baseline/samples.txt` and `results/routed/samples.txt`.
+Checkpoints at iteration 5000, temperature 0.8; full sets in `results/dense_v0/samples.txt` and `results/v0_batch_routing/samples.txt`.
 
 - **Story**, prompt `Once upon a time`. Dense: *"...there lived a tidy little girl. One day she went to the park with her mom. Her mom said, "Let's go for a walk!"..."* Routed: *"...there lived a tidy little girl named Lucy. Lucy loved to play outside in the sunshine. One morning she went to a tree to pick a big tree..."* Both are readable at this scale. The routed stories were more repetitive (one sample repeats "The boat...").
 - **Math**, prompt `Q: 37 + 48 = A:`. Both models learned the format and get small sums and products right (`26 - 5 = 21`, `9 x 7 = 63`), and both get the prompt itself wrong (the answer is 85; dense gave 80-88, routed gave 88, 95 and 128) and the large products wrong (521 x 6 = 3126, but the model wrote 3776).
@@ -146,7 +146,7 @@ Tests (`python -m pytest tests/`) check the following:
 
 ## Runtime on a T4
 
-Measured on the dense baseline run (Kaggle T4, `results/baseline/run.log`):
+Measured on the dense baseline run (Kaggle T4, `results/dense_v0/run.log`):
 
 | Stage | Time |
 |---|---|
