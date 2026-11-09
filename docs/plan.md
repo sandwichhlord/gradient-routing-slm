@@ -29,7 +29,14 @@ These times are estimates; nothing in v3 has run on a GPU. The new data changes 
 3. `gating_layers.csv`: the `ctx_*_effect` columns over training.
 4. `damage_summary.txt`, `failure_trace_summary.txt`, `unlearn_summary.txt`, `context_sensitivity.txt`, then `results/comparison_gated.csv`.
 
-**What would count as a positive result (to agree on):** in a gated run but not in dense, (a) at least one functional group (it damages arithmetic digits and number words in word problems, and not digits in stories), and (b) deleting the arithmetic-traced groups costs clearly more held-out arithmetic accuracy than the same-size random deletion, at a small story and code loss change. One seed only gives a first reading; more seeds come after it.
+## Pre-registered success criteria (2026-11-09, committed before any v3 result exists)
+
+These are fixed before the first v3 GPU run and are not to be changed after seeing results.
+
+1. **Health** (every run): no NaN; per-layer activation norms (`act_norm_l*` in `metrics.csv`) within 10x of dense; per-domain val loss within 15% of dense.
+2. **Evolved beats fixed** only if BOTH: its failure-trace consistency is higher than fixed's, AND its unlearning collateral damage (story and code loss increase after deleting the arithmetic-traced groups) is lower than fixed's. Seed 0 only decides whether to run more seeds. Any claim needs 3 seeds with bootstrap CIs.
+3. **"Functional" groups** are claimed only on format-matched categories (digits in prose arithmetic, number words in word problems, digits in stories), and only above both the within-context noise floor and size-matched random groups. Comparisons with the Q/A format (`Q: a op b = A: c`) are reported separately, labelled "format", and support no functional claim.
+4. **Smoothing helped** only if `gated_evolved` (route_smooth 0.9) beats `gated_evolved_sm0` (route_smooth 0) on the format-matched context-sensitivity effect.
 
 ## Future work (cut from the current scope)
 
