@@ -174,7 +174,7 @@ class GateRouter:
     The model calls router.begin_forward(idx) and router.gate(layer, h) itself.
     """
 
-    def __init__(self, model, layers=(2, 3, 4, 5), n_groups=8, k=3, tau=0.1, gamma=0.001, smooth=0.9, groups="fixed",
+    def __init__(self, model, layers=(2, 3, 4, 5), n_groups=8, k=4, tau=0.1, gamma=0.001, smooth=0.9, groups="fixed",
                  cluster_start=500, cluster_every=500, knn=32, resolution=1.0, min_size=16, max_move=0.05, ema=0.99,
                  sample_tokens=512, seed=0, apply=True, eot=50256, gate_grad=True, score="relative"):
         assert score in ("relative", "share"), score

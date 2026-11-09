@@ -58,7 +58,7 @@ DEFAULTS = dict(
     plasticity="rank", consolidate=False, beta=0.5, assembly_sample_tokens=512,
     # gated mode (v3). Shares cluster_start (gating starts, dense before), cluster_every, knn, resolution, min_size,
     # route_gamma (balancing bias step), route_ema (activity and correlation EMA) and assembly_sample_tokens
-    groups="fixed", n_groups=8, gate_k=3, gate_tau=0.1, route_smooth=0.9, gated_layers="2,3,4,5", max_move=0.05,
+    groups="fixed", n_groups=8, gate_k=4, gate_tau=0.1, route_smooth=0.9, gated_layers="2,3,4,5", max_move=0.05,
     gate_grad=True,   # gradient through the group score into the activations (not the baseline, bias or threshold)
     gate_score="share",  # share: G * ||h_g|| / sum of all groups' norms; relative: mean |h| / running baseline
                          # (default chosen by the pre-GPU smoke comparison in docs/plan.md)
