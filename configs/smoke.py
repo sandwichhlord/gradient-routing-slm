@@ -19,3 +19,5 @@ ckpt_interval = 50
 # assembly mode: cluster early so a 100-iter run exercises it
 cluster_start = 30
 cluster_every = 30
+# gated mode: the smoke model has only 2 layers
+gated_layers = "0,1"

@@ -1,0 +1,94 @@
+# samples from checkpoint @ iter 5000 (temperature=0.8, top_k=200, max_new_tokens=120)
+
+=== prompt: 'Once upon a time' | sample 1 ===
+Once upon a time there was an old man. He was very kind and so kind to each other. One day, he noticed a bright, dirty spider flying under the bed. He hopped over to investigate and found a shiny bulb. The spider closed its eyes and grabbed the bulb inside.
+
+The old man was very happy and cheered! He could barely believe his eyes. He knew it was the perfect plant he needed to look at it. But with a lot of curiosity, he slowly closed his eyes.
+
+Suddenly, he felt something strange. It was an unknown plant! He had never seen anything in
+
+=== prompt: 'Once upon a time' | sample 2 ===
+Once upon a time there was a little boy who was very hungry. He had to wait for the day to eat lunch.
+
+The boy hopped out of the door and said, "I will help you. Do you need me to eat?"
+
+The little boy nodded and the little boy started to eat Mom. He said, "Okay, Mom. I will go to the kitchen."
+
+They ran to the kitchen and got some berries. They talked, danced, and laughed and talked. They were very happy.
+
+After lunch, they sat down a chair and enjoyed their dinner. The man
+
+=== prompt: 'Once upon a time' | sample 3 ===
+Once upon a time there lived a little girl named Lily. She was very curious and loved to discover things. 
+
+One morning, she wanted to know what she was going to do. She went outside and saw a big, colourful flower. She asked her mommy to look at it and her mommy said, "Honey, the flower is so big and soft."
+
+Lily was very happy with the flower that she could carry. She showed it to her mommy and daddy. They said, "Wow, that's so pretty!" So they went to her house together and found many things
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 1 ===
+Q: 37 + 48 = A: 88
+Q: 667 - 1 = A: 656
+Q: 691 - 33 = A: 636
+Q: 9 + 845 = A: 845
+Q: 1 + 851 = A: 856
+Q: 642 - 1 = A: 649
+Q: 1 + 0 = A: 1
+Q: 281 + 0 = A: 256
+Q: 15 x 58 = A: 830
+Q: 0 - 9 = A: -9
+Q: 7 x 731 = A: 4982
+Q: 1
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 2 ===
+Q: 37 + 48 = A: 95
+Q: 32 + 6 = A: 38
+Q: 53 - 22 = A: 34
+Q: 7 x 0 = A: 0
+Q: 73 + 1 = A: 76
+Q: 6 x 6 = A: 36
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 3 ===
+Q: 37 + 48 = A: 78
+Q: 26 - 5 = A: 21
+Q: 521 x 6 = A: 3776
+Q: 4 + 9 = A: 13
+Q: 8 - 4 = A: 4
+Q: 1 + 7 = A: 8
+Q: 42 + 3 = A: 46
+Q: 939 + 769 = A: 1606
+Q: 0 x 784 = A: 0
+Q: 7 + 3 = A: 10
+Q: 5 x 2 = A: 10
+Q: 9 x 66 = A: 646
+Q
+
+=== prompt: 'def add(a, b):' | sample 1 ===
+def add(a, b):
+        :return :r: the '''
+        :return:
+        :r: The current data containing the list of a instance of the form.
+        :r: The defaultDict, or the ``check_app_cmd()
+
+        :return: a list of options required
+        :return: The list of group of options are
+        :return
+
+=== prompt: 'def add(a, b):' | sample 2 ===
+def add(a, b):
+        o = b.readline(".join(c, b.","([(r.split(),().[(r)), d.','(r), '[0].id))[0])
+        o.write('# %s: %s, %s.split(r))
+       o = b
+       o.write('# %s: %s, %s.split())
+       o = b.
+
+=== prompt: 'def add(a, b):' | sample 3 ===
+def add(a, b):
+    """
+    Number of the : A: A list of type for the c. One entry of the dtype set).
+    """
+    def GetFrom(a, b, b, c, b):
+        """
+        This is a string from the self.
+        :param b: The string will be passed and
+        """
+        # If the type is None

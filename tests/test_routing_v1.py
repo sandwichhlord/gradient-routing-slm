@@ -227,10 +227,11 @@ def test_mixed_domain_window_would_leak_which_is_why_label_mode_uses_pure_window
 
 @pytest.fixture(scope="module")
 def smoke_data(tmp_path_factory):
-    """Same data as `SMOKE=1 run_all.sh`, which the golden metrics were produced on."""
+    """The v0-v2 smoke corpus (no deconfounding data, no held-out arithmetic), which the golden metrics were produced on."""
     d = tmp_path_factory.mktemp("data")
     subprocess.run([sys.executable, os.path.join(ROOT, "data", "prepare.py"), "--synthetic",
-                    "--synthetic_tokens", "50000", "--out_dir", str(d)], check=True, capture_output=True)
+                    "--synthetic_tokens", "50000", "--deconf_frac", "0", "--holdout_arith", "0", "--out_dir", str(d)],
+                   check=True, capture_output=True)
     return d
 
 
@@ -362,6 +363,9 @@ def test_smoke_run_all_completes(mode, tmp_path):
                 "ablation_summary.txt", "block_norms.csv"]
     if mode != "dense":
         expected += ["routing_stats.csv", "routing_by_domain.png"]
+    else:  # the v3 evaluations, on post-hoc groups
+        expected += ["groups_posthoc.json", "context_sensitivity.json", "damage_table.csv", "damage_summary.json",
+                     "failure_trace_summary.json", "unlearn_summary.json"]
     for name in expected:
         assert (out / name).stat().st_size > 0, name
     assert not (mode == "dense" and (out / "routing_stats.csv").exists())
@@ -369,7 +373,7 @@ def test_smoke_run_all_completes(mode, tmp_path):
 
 def test_default_output_dir_is_named_after_mode_and_seed():
     with open(os.path.join(ROOT, "run_all.sh"), encoding="utf-8") as f:
-        assert 'OUT="${OUT_DIR:-out_${MODE}_s${SEED}}"' in f.read()
+        assert 'OUT="${OUT_DIR:-out_${NAME}${TAG}_s${SEED}}"' in f.read()   # NAME is the mode, or gated_<groups>
 
 
 def test_compare_reads_old_and_new_runs(tmp_path):

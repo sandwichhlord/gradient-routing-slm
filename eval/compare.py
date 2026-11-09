@@ -5,6 +5,11 @@ report mean and std across its runs. Mean S is the mean of the `specialization` 
 eval/ablate.py reports. tokens_per_sec is the median over the run; old runs did not log it, so it is taken from the
 median ms/it in run.log. The asm_* columns come from eval/ablate_assemblies.py (assembly_summary.json in the run folder)
 and the posthoc_* columns from its post-hoc mode (posthoc/assembly_summary.json).
+
+Gated-mode table (results/comparison_gated.csv): one row per group of runs that have the v3 evaluations (dense,
+gated_fixed, gated_evolved, ...): final val loss, damage-table classes and mean damage per category
+(damage_summary.json), held-out arithmetic accuracy and failure-trace numbers (failure_trace_summary.json), unlearning
+before/after (unlearn_summary.json) and context-sensitivity effects at route_smooth 0 and 0.9 (context_sensitivity.json).
 """
 import argparse
 import csv
@@ -80,6 +85,81 @@ def read_run(folder):
     return out
 
 
+GATED = [
+    ("val_story", None), ("val_math", None), ("val_code", None),
+    ("n_lexical", ("damage_summary.json", lambda j: j["classes"]["lexical"])),
+    ("n_functional", ("damage_summary.json", lambda j: j["classes"]["functional"])),
+    ("dmg_arith_digit", ("damage_summary.json", lambda j: j["mean_damage"].get("tag_digit_in_arith_answer"))),
+    ("dmg_story_digit", ("damage_summary.json", lambda j: j["mean_damage"].get("tag_digit_in_story"))),
+    ("dmg_wp_word", ("damage_summary.json", lambda j: j["mean_damage"].get("tag_number_word_in_word_problem"))),
+    ("arith_acc", ("failure_trace_summary.json", lambda j: j["accuracy"])),
+    ("trace_consistency", ("failure_trace_summary.json", lambda j: j["mean_top_consistency"])),
+    ("trace_ablate_d_acc", ("failure_trace_summary.json", lambda j: j["joint_accuracy_change"])),
+    ("trace_ablate_d_story", ("failure_trace_summary.json", lambda j: j["joint_d_story"])),
+    ("trace_ablate_d_code", ("failure_trace_summary.json", lambda j: j["joint_d_code"])),
+    ("unlearn_d_acc", ("unlearn_summary.json", lambda j: j["accuracy_change"])),
+    ("unlearn_rand_d_acc", ("unlearn_summary.json", lambda j: j["random_accuracy_change"])),
+    ("unlearn_d_story", ("unlearn_summary.json", lambda j: j["d_story"])),
+    ("unlearn_d_code", ("unlearn_summary.json", lambda j: j["d_code"])),
+    ("ctx_digits_s0", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.0"]["digits"])),
+    ("ctx_digits_s0.9", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.9"]["digits"])),
+    ("ctx_words_s0", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.0"]["number_words"])),
+    ("ctx_words_s0.9", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.9"]["number_words"])),
+]
+GATED_FILES = {"damage_summary.json", "failure_trace_summary.json", "unlearn_summary.json", "context_sensitivity.json"}
+
+
+def read_gated(folder, run):
+    """The v3 evaluation numbers of one run, or None if it has none."""
+    if not any(os.path.exists(os.path.join(folder, f)) for f in GATED_FILES):
+        return None
+    cache, out = {}, {}
+    for name, src in GATED:
+        if src is None:
+            out[name] = run[name]
+            continue
+        path = os.path.join(folder, src[0])
+        if path not in cache:
+            cache[path] = json.load(open(path)) if os.path.exists(path) else None
+        try:
+            v = src[1](cache[path]) if cache[path] is not None else None
+        except (KeyError, TypeError):
+            v = None
+        out[name] = None if v is None or (isinstance(v, float) and v != v) else float(v)
+    return out
+
+
+def write_gated_table(runs, folders, out_dir):
+    rows = {name: read_gated(folders[name], r) for name, r in runs.items()}
+    rows = {k: v for k, v in rows.items() if v is not None}
+    if not rows:
+        return
+    by_group = {}
+    for name, r in rows.items():
+        by_group.setdefault(group_of(name), []).append(r)
+    order = ["dense", "gated_fixed", "gated_evolved"]
+    groups = sorted(by_group, key=lambda g: (order.index(g) if g in order else len(order), g))
+    names = [m for m, _ in GATED]
+    with open(os.path.join(out_dir, "comparison_gated.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["group", "n_runs", *[c for m in names for c in (m, f"{m}_std")]])
+        for g in groups:
+            row = [g, len(by_group[g])]
+            for m in names:
+                vals = [r[m] for r in by_group[g] if r[m] is not None]
+                row += [fmt(statistics.mean(vals)) if vals else "", fmt(statistics.stdev(vals)) if len(vals) > 1 else ""]
+            w.writerow(row)
+    print()
+    print(f"{'metric':22s}" + "".join(f"{g:>18s}" for g in groups))
+    for m in names:
+        cells = []
+        for g in groups:
+            vals = [r[m] for r in by_group[g] if r[m] is not None]
+            cells.append(f"{(fmt(statistics.mean(vals), 3) + (f' (n={len(vals)})' if len(vals) > 1 else '')) if vals else '-':>18s}")
+        print(f"{m:22s}" + "".join(cells))
+    print(f"[compare] wrote comparison_gated.csv to {out_dir}")
+
+
 def summarise(runs):
     """{metric: (mean, std or None, n)} for one group."""
     out = {}
@@ -144,13 +224,13 @@ def main():
     args = p.parse_args()
     out_dir = args.out_dir or args.results_dir
 
-    runs = {}
+    runs, folders = {}, {}
     for name in sorted(os.listdir(args.results_dir)):
         folder = os.path.join(args.results_dir, name)
         if os.path.isfile(os.path.join(folder, "metrics.csv")):
             r = read_run(folder)
             if r:
-                runs[name] = r
+                runs[name], folders[name] = r, folder
     if not runs:
         raise SystemExit(f"no runs (folders with metrics.csv) in {args.results_dir}")
 
@@ -186,6 +266,7 @@ def main():
             cells.append(f"{fmt(mean, digits) + (' +- ' + fmt(std, digits) if std is not None else ''):>16s}")
         print(f"{g:20s} {len(by_group[g]):2d} " + " ".join(cells))
     print(f"[compare] wrote comparison.csv and comparison.png to {out_dir}")
+    write_gated_table(runs, folders, out_dir)
 
 
 if __name__ == "__main__":

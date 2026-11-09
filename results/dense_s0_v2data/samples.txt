@@ -1,0 +1,96 @@
+# samples from checkpoint @ iter 5000 (temperature=0.8, top_k=200, max_new_tokens=120)
+
+=== prompt: 'Once upon a time' | sample 1 ===
+Once upon a time, there was a little girl named Lily. Lily loved to play outside in the sunshine. One day, she went to the park with her mommy and saw her favorite butterfly. She asked her mommy if she could have it, but her mommy said no.
+
+Lily didn't want to take care of the butterfly, but she felt a little scared. She asked her mommy if she could have it. Her mommy said she could call the butterfly if she could. Lily said she could help make the butterfly feel better.
+
+At the park, Lily saw a big
+
+=== prompt: 'Once upon a time' | sample 2 ===
+Once upon a time there was a little boy who was very hungry. He had to wait and he started to eat lunch.
+
+The next day the little boy was very hungry but he knew he should not have eat too. He went to the kitchen to eat and found a little dish on the living room.
+
+He was so excited and he decided to eat it. The dish was so tasty that he ran to the kitchen and tried to eat it. He ate it every day and he was very proud of himself.
+
+The End.
+
+=== prompt: 'Once upon a time' | sample 3 ===
+Once upon a time there lived a little girl named Jane. She was very curious and she liked to explore. 
+
+One morning she went to a tree to pick a big, clear apple and she wanted to pick it. She asked her mom if she wanted to have it, so she said no. Jane nodded and kept searching.
+
+After a while she returned home, she found the juicy apple. She was so happy that she could carry it. But then her mom said, "This is so yummy!" Jane was very excited and asked for another piece of the apple she had seen. 
+
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 1 ===
+Q: 37 + 48 = A: 88
+Q: 667 - 1 = A: 657
+Q: 691 - 33 = A: 661
+Q: 9 + 845 = A: 845
+Q: 1 + 851 = A: 856
+Q: 642 - 1 = A: 649
+Q: 1 + 0 = A: 1
+Q: 281 + 0 = A: 247
+Q: 15 x 58 = A: 730
+Q: 0 - 903 = A: -975
+Q: 9 x 75 = A: 675
+Q: 4 x
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 2 ===
+Q: 37 + 48 = A: 80
+Q: 32 + 684 = A: 649
+Q: 22 + 6 = A: 28
+Q: 0 x 97 = A: 0
+Q: 1 x 5 = A: 5
+Q: 6 + 6 = A: 12
+Q: 658 x 913 = A: 645394
+Q: 876 - 6 = A: 864
+Q: 95 + 795 = A: 992
+Q: 924 x 4 = A: 3248
+Q: 912 + 20 = A: 959
+Q: 53 +
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 3 ===
+Q: 37 + 48 = A: 84
+Q: 26 - 5 = A: 21
+Q: 521 x 6 = A: 3189
+Q: 4 + 9 = A: 13
+Q: 8 - 4 = A: 4
+Q: 1 + 7 = A: 8
+Q: 42 + 3 = A: 46
+Q: 939 + 7 = A: 951
+Q: 7 + 9 = A: 16
+Q: 49 + 7 = A: 54
+Q: 87 + 5 = A: 92
+Q: 12 - 9 = A: 1
+Q: 915
+
+=== prompt: 'def add(a, b):' | sample 1 ===
+def add(a, b):
+                                 k = self.c.strftime('%Y %Y')
+                               if k in self.c.name:
+                                
+
+=== prompt: 'def add(a, b):' | sample 2 ===
+def add(a, b):
+	def _get_mgrids(a):
+		if (a == b.get_mapping()):
+			if (a == b.get_mock()):
+				if (a < b.get_mock()):
+					if (a == b.get_mock()):
+							if (a == b.get_mock()):
+										if (a == b.get_mock()
+
+=== prompt: 'def add(a, b):' | sample 3 ===
+def add(a, b): #strip a point at:
+        """
+        return self.request.get('data')[0]
+       
+    def add_dict(self):
+        """Set a single line to add.
+        
+        :param b: The command line to the one of the line.
+       """
+        if c:

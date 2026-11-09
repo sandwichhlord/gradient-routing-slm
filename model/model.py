@@ -69,6 +69,7 @@ class BlockMLP(nn.Module):
         self.token_router = None        # per-token routing (token / label modes), see model/routing.py
         self.assembly_router = None     # graded plasticity (assembly mode), see model/assemblies.py
         self.neuron_mask = None         # None or float tensor (hidden,): inference-time ablation of any neuron set
+        self.gate_router = None         # soft k-WTA over neuron groups (gated mode), see model/gating.py
         self.layer_idx = 0
         self.reset_norms()
 
@@ -102,6 +103,11 @@ class BlockMLP(nn.Module):
                                     + F.linear(h.detach() * (1.0 - P), self.c_proj.weight.detach()))
         if self.neuron_mask is not None:
             h = h * self.neuron_mask.to(device=h.device, dtype=h.dtype)
+        if self.gate_router is not None:
+            # after the mask, so a deleted neuron counts as silent when the groups compete
+            g = self.gate_router.gate(self.layer_idx, h)
+            if g is not None:
+                h = h * g
         capture = self.capture_energy and self.training
         if capture and self.energy_detach_input:
             # separate graph whose only parameters are this layer's c_fc (so its gradient can bypass routing masks)
@@ -148,6 +154,7 @@ class GPT(nn.Module):
             ln_f=nn.LayerNorm(cfg.n_embd, bias=cfg.bias),
         ))
         self.lm_head = nn.Linear(cfg.n_embd, cfg.vocab_size, bias=False)
+        self.gate_router = None  # set by model.gating.GateRouter; needs the token ids of every forward
         self.transformer.wte.weight = self.lm_head.weight  # weight tying
         self.apply(self._init_weights)
         for name, p in self.named_parameters():
@@ -170,6 +177,8 @@ class GPT(nn.Module):
         B, T = idx.size()
         assert T <= self.config.block_size, f"sequence length {T} > block_size {self.config.block_size}"
         pos = torch.arange(T, dtype=torch.long, device=idx.device)
+        if self.gate_router is not None:
+            self.gate_router.begin_forward(idx)
         x = self.transformer.drop(self.transformer.wte(idx) + self.transformer.wpe(pos))
         for block in self.transformer.h:
             x = block(x)
@@ -198,6 +207,12 @@ class GPT(nn.Module):
         """Ablate an arbitrary set of hidden neurons in one layer (and clear every other mask)."""
         self.clear_ablation()
         self.mlps()[layer].neuron_mask = torch.as_tensor(mask, dtype=torch.float32)
+
+    def set_neuron_masks(self, masks):
+        """Ablate neuron sets in several layers at once: {layer: (hidden,) mask}. Clears every other mask."""
+        self.clear_ablation()
+        for layer, mask in masks.items():
+            self.mlps()[layer].neuron_mask = torch.as_tensor(mask, dtype=torch.float32)
 
     def clear_ablation(self):
         for m in self.mlps():

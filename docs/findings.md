@@ -180,3 +180,48 @@ What a sceptical reviewer would ask, and where we stand. "Open" means we have no
 | **Positive correlations only.** Anti-correlated neurons never link, so opposing pairs that work together are ignored. | Accepted limitation. |
 | **Does training with p < 1 simply train less?** | Measured: the loss curves compare directly with dense, and `summary.txt` records mean p. On smoke runs mean p after clustering was about 0.55, as rank predicts. |
 
+## 9. First assembly run (assembly_s0) against the dense post-hoc control (dense_s0)
+
+Both on the T4, seed 0, 5000 iterations, real data. Files in `results/dense_s0_v2data/` (renamed from `dense_s0`, see `docs/plan.md`) and `results/assembly_s0/` (checkpoints not in git).
+
+**Health: fine.** Final val loss 2.139 / 1.479 / 2.508 (story / math / code) against dense 2.118 / 1.457 / 2.470, so 1-1.5% worse. No activation blow-up (largest final norm 4.3 against 4.7 for dense; `token_s0` reached 178). No degenerate layers, no dead neurons. Layer 4's largest assembly reached 48% of the layer at the last clustering, just under the 50% limit. Training took 23 min, the whole pipeline about 50 min, as estimated.
+
+**Specialization: no significant difference.** Assembly S values below come from assemblies tracked during training. The dense values come from post-hoc clustering of the finished model on validation data, so the two groupings were built differently.
+
+| Metric | assembly_s0 | dense_s0 post hoc | Difference (95% CI) |
+|---|---|---|---|
+| Mean S | 0.187 | 0.158 | +0.029 (-0.035 to +0.092) |
+| Mean S above own random sets | 0.125 | 0.105 | +0.020 (-0.041 to +0.082) |
+| Size-weighted S | 0.173 | 0.152 | +0.020 (-0.041 to +0.083) |
+| Damage-weighted S | 0.141 | 0.152 | -0.011 (-0.275 to +0.192) |
+
+The CIs bootstrap assemblies within each model (one seed each). Both models beat their random sets. The same kinds of group appear in both, for example a layer 4 math group on `x`, `+` and `-` (S 0.42 in assembly, 0.29 in dense). Stability (ARI) rose from 0.21 to about 0.67 over training, but the learning rate fell tenfold over the same period and dense has no matching measurement. A likely reason for the null result, which we did not test: per-domain plasticity was nearly uniform (mean 0.557 / 0.550 / 0.545 for story / math / code; S computed on each assembly's per-domain plasticity was about 0.011 at the end). Rank plasticity seems to sort by token more than by domain.
+
+**Consequence.** Scope was cut to the minimum in `docs/plan.md`: the assembly sweeps and seeds are now future work, and v3 (section 10) asks a narrower question.
+
+## 10. v3: deconfounding data, gated mode, and a zero-training diagnostic
+
+**The confound.** In the v0-v2 corpus, digits appear almost only in arithmetic and arithmetic only as digits. In 300K tokens of real TinyStories text (the sample used below), 48 tokens are digits. So a group that "serves math" cannot be told apart from a group that serves digit tokens, and S cannot separate function from vocabulary. v3 adds about 10% synthetic deconfounding data (word problems in words, stories with numbers, arithmetic inside code) and per-token category tags for evaluation (`deconf.py`).
+
+**Gated mode.** A forward-pass soft k-winners-take-all over neuron groups, with no gradient masking or scaling (README, Method). Fixed and evolved groups share every line of code except the group assignment. `route_smooth` (default 0.9) is a causal EMA of the group scores along the sequence, so selection can depend on the context and not only on the current token.
+
+**Diagnostic before any GPU run: context sensitivity on `dense_s0`.** `eval/context_sensitivity.py`, CPU, on the existing `dense_s0` checkpoint. Groups are post hoc: co-activation and Leiden on the first half of a small real-data sample (200 batches), reduced to 8 groups per layer in layers 2-5. Gating is inference-only: selections are computed (k = 3 of 8, bias 0) and the forward pass stays dense. For each token id that occurs in both contexts, we take the Jaccard distance between the selected-group sets of two occurrences. Cross pairs one occurrence from each context. Within pairs two occurrences from the same context, which gives the noise floor. Effect = cross - within. Results are averaged over occurrence pairs (up to 50 per context), then over token ids: 99 digit ids, 11 number-word ids.
+
+| Layer | Digits, smooth 0: cross / within / effect | Digits, smooth 0.9 | Number words, smooth 0 | Number words, smooth 0.9 |
+|---|---|---|---|---|
+| 2 | 0.680 / 0.510 / **+0.170** | 0.643 / 0.363 / **+0.280** | 0.582 / 0.501 / +0.081 | 0.615 / 0.522 / +0.094 |
+| 3 | 0.717 / 0.411 / **+0.306** | 0.928 / 0.341 / **+0.587** | 0.309 / 0.272 / +0.036 | 0.186 / 0.179 / +0.007 |
+| 4 | 0.624 / 0.422 / **+0.202** | 0.916 / 0.298 / **+0.618** | 0.290 / 0.285 / +0.006 | 0.367 / 0.356 / +0.012 |
+| 5 | 0.666 / 0.486 / **+0.180** | 0.922 / 0.321 / **+0.600** | 0.429 / 0.393 / +0.036 | 0.440 / 0.428 / +0.012 |
+| Mean | +0.214 | +0.521 | +0.040 | +0.031 |
+
+Contexts: digits in arithmetic lines (`Q: 37 + 48 = A: 85`) against digits in number stories ("Mia was 7 and had 3 cats"). Number words in word problems ("three plus four makes seven") against number words in number stories.
+
+**What this shows.**
+- In the dense model, a digit picks different groups in arithmetic than in a story, well beyond the within-context noise. Smoothing more than doubles this: at 0.9, in layers 3-5, the top-3 sets of the same digit in the two contexts are almost disjoint (cross 0.92-0.93).
+- Number words pick nearly the same groups in word problems as in stories (effect 0.01-0.09), with or without smoothing.
+- So selection follows the surface context. The digit contexts differ in format (Q/A lines against prose) and the number-word contexts do not (both prose). This does **not** show that selection follows arithmetic function. If it did, word problems would separate from stories too.
+
+**Caveats.** `dense_s0` never trained on word problems or number stories. The probes are generated text from `deconf.py`. The clustering sample is the start of the HuggingFace streams, which `dense_s0` trained on. Selections come from a model that never trained with gates, with zero bias. One checkpoint, 11 number-word ids. Files are in `results/dense_s0_v2data/context_diag/`.
+
+**What to look for in the trained runs.** The number-word effect is the informative one. If gated training with deconfounding data makes word problems route away from stories while digits in stories do not, that is functional routing. The damage table checks the same thing by ablation (functional against lexical groups). The `gated_evolved` run at `route_smooth=0` tests whether smoothing matters during training, not only at inference.

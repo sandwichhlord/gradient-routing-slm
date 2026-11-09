@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# Full pipeline: prepare -> train -> sample -> plots -> ablate (-> routing plot). Stops on the first error.
-#   ROUTING_MODE=token SEED=0 bash run_all.sh     # full run on real data; outputs in out_token_s0/
-#   SMOKE=1 ROUTING_MODE=label bash run_all.sh    # tiny CPU-friendly run on synthetic data (2 layers, 64 dim, 100 iters)
+# Full pipeline: prepare -> train -> sample -> plots -> ablate -> routing / group evaluation. Stops on the first error.
+#   ROUTING_MODE=gated GATE_GROUPS=evolved SEED=0 bash run_all.sh   # full run on real data; outputs in out_gated_evolved_s0/
+#   SMOKE=1 ROUTING_MODE=gated bash run_all.sh                 # tiny CPU-friendly run on synthetic data (2 layers, 100 iters)
 # Env:
-#   ROUTING_MODE  dense (default), batch (v0), token (v1), label (oracle baseline), assembly (v2). ROUTED=1 means batch.
+#   ROUTING_MODE  dense (default), gated (v3), or the older batch (v0), token (v1), label (oracle), assembly (v2).
+#                 ROUTED=1 means batch. dense and gated runs get the v3 evaluations (damage table, failure trace,
+#                 unlearning, context sensitivity); a dense run uses post-hoc groups for them.
+#   GATE_GROUPS   gated mode: fixed (default) or evolved (not GROUPS: bash reserves that name)
+#   ROUTE_SMOOTH  gated mode: causal EMA of group scores along the sequence (default 0.9); also the post-hoc gating of
+#                 a dense run's evaluations. A non-default value changes the default OUT_DIR, e.g. out_gated_evolved_sm0_s0
 #   RESOLUTION, FLOOR, PLASTICITY  assembly mode settings (defaults 1.0, 0.1, rank)
 #   LR_SCALE      scales the learning rate, e.g. a dense run matched to an assembly run's mean p (see its summary.txt)
 #                 Non-default values of these four change the default OUT_DIR.
@@ -21,16 +26,22 @@ export PYTHONUNBUFFERED=1
 
 MODE="${ROUTING_MODE:-dense}"
 if [[ "${ROUTED:-0}" == "1" && -z "${ROUTING_MODE:-}" ]]; then MODE=batch; fi
-case "$MODE" in dense|batch|token|label|assembly) ;; *) echo "unknown ROUTING_MODE=$MODE"; exit 2;; esac
+case "$MODE" in dense|batch|token|label|assembly|gated) ;; *) echo "unknown ROUTING_MODE=$MODE"; exit 2;; esac
 SEED="${SEED:-0}"
+NAME="$MODE"
+if [[ "$MODE" == "gated" ]]; then
+  GATE_GROUPS="${GATE_GROUPS:-fixed}"
+  case "$GATE_GROUPS" in fixed|evolved) ;; *) echo "unknown GATE_GROUPS=$GATE_GROUPS"; exit 2;; esac
+  NAME="gated_$GATE_GROUPS"
+fi
 # runs with non-default settings get their own folder, e.g. out_assembly_r0.5_s0 or out_dense_lr0.55_s0
 TAG=""
 if [[ -n "${RESOLUTION:-}" && "$RESOLUTION" != "1.0" ]]; then TAG+="_r$RESOLUTION"; fi
 if [[ -n "${FLOOR:-}" && "$FLOOR" != "0.1" ]]; then TAG+="_f$FLOOR"; fi
 if [[ -n "${PLASTICITY:-}" && "$PLASTICITY" != "rank" ]]; then TAG+="_$PLASTICITY"; fi
 if [[ -n "${LR_SCALE:-}" && "$LR_SCALE" != "1.0" ]]; then TAG+="_lr$LR_SCALE"; fi
-if [[ -n "$TAG" ]]; then OUT_DIR="${OUT_DIR:-out_${MODE}${TAG}_s${SEED}}"; fi
-OUT="${OUT_DIR:-out_${MODE}_s${SEED}}"
+if [[ -n "${ROUTE_SMOOTH:-}" && "$ROUTE_SMOOTH" != "0.9" ]]; then TAG+="_sm$ROUTE_SMOOTH"; fi
+OUT="${OUT_DIR:-out_${NAME}${TAG}_s${SEED}}"
 
 if [[ "${SMOKE:-0}" == "1" ]]; then
   echo ">>> SMOKE mode: synthetic data, configs/smoke.py"
@@ -40,6 +51,10 @@ if [[ "${SMOKE:-0}" == "1" ]]; then
   SAMPLE=(--max_new_tokens 40)
   ASSEMBLY=(--eval_iters 2 --posthoc_steps 20 --random_sets 2)
   PROBE=(--batches 2)
+  V3=(--gated_layers 0,1 --posthoc_batches 10 --windows 8)
+  DAMAGE=(--random_sets 1)
+  TRACE=(--n_problems 100)
+  UNLEARN=(--n_problems 100 --random_sets 1)
 else
   PREP=()
   CONFIG=configs/baseline.py
@@ -47,6 +62,10 @@ else
   SAMPLE=()
   ASSEMBLY=(--eval_iters 20)
   PROBE=()
+  V3=()
+  DAMAGE=()
+  TRACE=()
+  UNLEARN=()
 fi
 TRAIN=(--config "$CONFIG" --routing_mode "$MODE" --seed "$SEED" --device "$DEVICE" --out_dir "$OUT")
 EVAL_DATA=()
@@ -60,6 +79,8 @@ if [[ -n "${RESOLUTION:-}" ]]; then TRAIN+=(--resolution "$RESOLUTION"); ASSEMBL
 if [[ -n "${FLOOR:-}" ]]; then TRAIN+=(--floor "$FLOOR"); fi
 if [[ -n "${PLASTICITY:-}" ]]; then TRAIN+=(--plasticity "$PLASTICITY"); fi
 if [[ -n "${LR_SCALE:-}" ]]; then TRAIN+=(--lr_scale "$LR_SCALE"); fi
+if [[ "$MODE" == "gated" ]]; then TRAIN+=(--groups "$GATE_GROUPS"); fi
+if [[ -n "${ROUTE_SMOOTH:-}" ]]; then TRAIN+=(--route_smooth "$ROUTE_SMOOTH"); V3+=(--route_smooth "$ROUTE_SMOOTH"); fi
 echo ">>> mode=$MODE seed=$SEED outputs in $OUT/"
 
 T0=$SECONDS
@@ -82,9 +103,15 @@ stage 4 "plots"
 stage 5 "ablate"
 "$PY" eval/ablate.py --device "$DEVICE" --out_dir "$OUT" "${EVAL_DATA[@]}" "${ABLATE[@]}"
 
-stage 6 "routing and assembly evaluation"
+stage 6 "routing, assembly and group evaluation"
+V3_ARGS=(--device "$DEVICE" --out_dir "$OUT" "${EVAL_DATA[@]}" "${V3[@]}")
 case "$MODE" in
-  dense) echo "dense mode: no routing stats" ;;
+  dense|gated)
+    "$PY" eval/context_sensitivity.py "${V3_ARGS[@]}"
+    "$PY" eval/damage_table.py "${V3_ARGS[@]}" "${DAMAGE[@]}"
+    "$PY" eval/failure_trace.py "${V3_ARGS[@]}" "${TRACE[@]}"
+    "$PY" eval/unlearn.py "${V3_ARGS[@]}" "${UNLEARN[@]}"
+    ;;
   assembly)
     "$PY" eval/assembly_health_plot.py --out_dir "$OUT"
     "$PY" eval/ablate_assemblies.py --device "$DEVICE" --out_dir "$OUT" --source final "${EVAL_DATA[@]}" "${ASSEMBLY[@]}"

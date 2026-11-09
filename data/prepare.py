@@ -2,14 +2,21 @@
 
 Outputs (in --out_dir, default data/out/):
   train.bin         uint16 tokens, documents from all domains shuffled together
-  train_domain.bin  uint8 domain id per train token (0=story, 1=math, 2=code), for later routing work
+  train_domain.bin  uint8 domain id per train token (0=story, 1=math, 2=code), for logging and evaluation
+  train_tags.bin    uint8 category tag per train token (deconf.TAGS), for evaluation only
   val_story.bin, val_math.bin, val_code.bin   held-out uint16 tokens per domain
+  val_<domain>_tags.bin                       category tag per val token
   meta.json         token counts, mode (real / synthetic / synthetic_fallback), args
 
 Every document is followed by the GPT-2 <|endoftext|> token.
 
+Deconfounding data (--deconf_frac, default 0.1): synthetic word problems (math), number stories (story) and code
+arithmetic (code), in total deconf_frac x the real budget, a third each, split into train and val like the real data.
+--holdout_arith (default 1) keeps a fixed ~5% of arithmetic problems out of training (deconf.is_heldout).
+--deconf_frac 0 --holdout_arith 0 rebuilds the v0-v2 corpus exactly.
+
 Usage:
-  python data/prepare.py                       # real data (TinyStories + synthetic math + codeparrot)
+  python data/prepare.py                       # real data (TinyStories + synthetic math + codeparrot + deconf)
   python data/prepare.py --synthetic           # tiny offline fake data for all 3 domains
 """
 import argparse
@@ -21,6 +28,9 @@ import time
 
 import numpy as np
 import tiktoken
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from deconf import TAGS, deconf_docs_iter, math_docs_iter, math_line, tag_tokens  # noqa: E402,F401
 
 DOMAINS = ["story", "math", "code"]
 
@@ -77,23 +87,6 @@ def split_val(docs, val_tokens):
         val.append(d)
         n += len(d)
     return docs, val
-
-
-# ----------------------------------------------------------------------------- math (owned generator)
-
-def math_line(rng):
-    def num():
-        digits = rng.randint(1, 3)
-        return rng.randint(0, 10 ** digits - 1)
-    a, b = num(), num()
-    op = rng.choice(["+", "-", "x"])
-    ans = a + b if op == "+" else a - b if op == "-" else a * b
-    return f"Q: {a} {op} {b} = A: {ans}"
-
-
-def math_docs_iter(rng, lines_per_doc=20):
-    while True:
-        yield "\n".join(math_line(rng) for _ in range(lines_per_doc))
 
 
 # ----------------------------------------------------------------------------- HF sources
@@ -171,7 +164,7 @@ def build(args, synthetic):
         val_tokens = args.val_tokens
 
     sources = {
-        "math": lambda: math_docs_iter(rng),
+        "math": lambda: math_docs_iter(rng, holdout=bool(args.holdout_arith)),
         "story": (lambda: fake_iter(fake_story, rng)) if synthetic
         else (lambda: hf_iter("roneneldan/TinyStories", "text")),
         "code": (lambda: fake_iter(fake_code, rng)) if synthetic
@@ -185,7 +178,20 @@ def build(args, synthetic):
                        max_doc_tokens=args.max_doc_tokens if d == "code" else None, name=d)
         train_docs[d], val_docs[d] = split_val(docs, val_tokens)
         print(f"[prepare] {d}: {len(docs)} train docs, {len(val_docs[d])} val docs ({time.time()-t0:.0f}s)", flush=True)
-    return train_docs, val_docs
+    deconf_counts = {d: 0 for d in DOMAINS}
+    if args.deconf_frac > 0:
+        drng = random.Random(args.seed + 1)  # own stream: the real data does not depend on deconf_frac
+        per_domain = int(args.deconf_frac * sum(budgets.values()) / len(DOMAINS))
+        for d in DOMAINS:
+            share = val_tokens / (budgets[d] + val_tokens)
+            docs = collect(deconf_docs_iter(d, drng), per_domain, name=f"deconf-{d}")
+            docs, val = split_val(docs, int(share * per_domain))
+            train_docs[d] += docs
+            val_docs[d] += val
+            deconf_counts[d] = int(sum(len(x) for x in docs) + sum(len(x) for x in val))
+            print(f"[prepare] deconf {d}: {deconf_counts[d]:,} tokens ({len(docs)} train docs, {len(val)} val docs)",
+                  flush=True)
+    return train_docs, val_docs, deconf_counts
 
 
 def main():
@@ -198,6 +204,8 @@ def main():
     p.add_argument("--max_doc_tokens", type=int, default=4096, help="truncate very long code files")
     p.add_argument("--synthetic", action="store_true", help="tiny offline fake data for all 3 domains")
     p.add_argument("--synthetic_tokens", type=int, default=200_000, help="train tokens per domain in synthetic mode")
+    p.add_argument("--deconf_frac", type=float, default=0.1, help="deconfounding data as a fraction of the real budget")
+    p.add_argument("--holdout_arith", type=int, default=1, help="1: keep held-out arithmetic problems out of training")
     p.add_argument("--seed", type=int, default=1337)
     p.add_argument("--force", action="store_true", help="rebuild even if matching data already exists")
     args = p.parse_args()
@@ -205,7 +213,8 @@ def main():
 
     signature = {k: v for k, v in vars(args).items() if k not in ("out_dir", "force")}
     meta_path = os.path.join(args.out_dir, "meta.json")
-    needed = ["train.bin", "train_domain.bin"] + [f"val_{d}.bin" for d in DOMAINS]
+    needed = (["train.bin", "train_domain.bin", "train_tags.bin"]
+              + [f"val_{d}{x}.bin" for d in DOMAINS for x in ("", "_tags")])
     if not args.force and os.path.exists(meta_path) and all(os.path.exists(os.path.join(args.out_dir, f)) for f in needed):
         with open(meta_path) as f:
             meta = json.load(f)
@@ -215,7 +224,7 @@ def main():
 
     mode = "synthetic" if args.synthetic else "real"
     try:
-        train_docs, val_docs = build(args, synthetic=args.synthetic)
+        train_docs, val_docs, deconf_counts = build(args, synthetic=args.synthetic)
     except Exception as e:  # network / HF problems -> keep the pipeline alive offline
         if args.synthetic:
             raise
@@ -224,7 +233,7 @@ def main():
         print("[prepare] FALLING BACK TO TINY SYNTHETIC DATA. Results will NOT be meaningful.", file=sys.stderr)
         print("!" * 78 + "\n", file=sys.stderr, flush=True)
         mode = "synthetic_fallback"
-        train_docs, val_docs = build(args, synthetic=True)
+        train_docs, val_docs, deconf_counts = build(args, synthetic=True)
 
     # shuffle documents across domains into one training stream, tracking each token's domain
     rng = np.random.default_rng(args.seed)
@@ -234,12 +243,20 @@ def main():
     dom = [np.full(len(tagged[j][1]), tagged[j][0], dtype=np.uint8) for j in order]
     n_train = write_bin(os.path.join(args.out_dir, "train.bin"), docs)
     np.concatenate(dom).tofile(os.path.join(args.out_dir, "train_domain.bin"))
+    t0 = time.time()
+    np.concatenate([tag_tokens(tagged[j][1], DOMAINS[tagged[j][0]], enc) for j in order]).tofile(
+        os.path.join(args.out_dir, "train_tags.bin"))
+    print(f"[prepare] tagged {n_train:,} train tokens ({time.time() - t0:.0f}s)", flush=True)
 
     meta = {"mode": mode, "signature": signature, "vocab_size": enc.n_vocab, "eot": EOT,
             "domains": DOMAINS, "train_tokens": n_train,
-            "train_tokens_per_domain": {d: int(sum(len(x) for x in train_docs[d])) for d in DOMAINS}}
+            "train_tokens_per_domain": {d: int(sum(len(x) for x in train_docs[d])) for d in DOMAINS},
+            "deconf_tokens_per_domain": deconf_counts, "tags": TAGS, "val_tag_counts": {}}
     for d in DOMAINS:
         meta[f"val_{d}_tokens"] = write_bin(os.path.join(args.out_dir, f"val_{d}.bin"), val_docs[d])
+        tags = np.concatenate([tag_tokens(doc, d, enc) for doc in val_docs[d]])
+        tags.tofile(os.path.join(args.out_dir, f"val_{d}_tags.bin"))
+        meta["val_tag_counts"][d] = {t: int((tags == i).sum()) for i, t in enumerate(TAGS) if (tags == i).any()}
     with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2)
     print(f"[prepare] done ({mode}): {json.dumps({k: v for k, v in meta.items() if k != 'signature'})}")

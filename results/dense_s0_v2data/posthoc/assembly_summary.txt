@@ -1,0 +1,13 @@
+source: posthoc (mode of checkpoint: dense, iter 5000)
+assemblies: 51, per layer [7, 9, 10, 9, 7, 9]
+degenerate layers, left out below: []; dead neurons per layer: [0, 0, 0, 0, 0, 0]
+mean S: 0.1582, bootstrap 95% CI [0.1195, 0.2021]
+random same-size sets, mean S: 0.0529, 95% CI [0.0421, 0.0644]
+real minus random S, 95% CI: [0.0655, 0.1467]
+damage per neuron: real 0.001904, random 0.000199 nats
+size-weighted mean S: 0.1525
+damage-weighted mean S: 0.1521
+mean damage per assembly: 0.1801 nats, max 2.9475
+unablated val loss (second half of val): story=2.2044, math=1.4579, code=2.4866
+per-layer mean S: L0=0.260, L1=0.117, L2=0.188, L3=0.124, L4=0.086, L5=0.179
+time: 1278s

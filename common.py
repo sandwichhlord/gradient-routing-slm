@@ -137,10 +137,15 @@ def load_val(data_dir):
 
 
 def load_checkpoint(path, device):
+    """Model in eval mode. A gated checkpoint comes with its GateRouter attached (model.gate_router), because the gates
+    are part of its forward pass."""
     if not os.path.exists(path):
         raise FileNotFoundError(f"{path} missing - run train.py first")
     ckpt = torch.load(path, map_location=device, weights_only=False)
     model = GPT(GPTConfig(**ckpt["model_args"]))
     model.load_state_dict(ckpt["model"])
     model.to(device).eval()
+    if ckpt.get("config", {}).get("routing_mode") == "gated":
+        from model.gating import router_from_config
+        router_from_config(model, ckpt["config"]).load_state_dict(ckpt["router"])
     return model, ckpt

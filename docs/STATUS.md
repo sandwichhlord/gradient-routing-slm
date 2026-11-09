@@ -89,3 +89,13 @@ Neither run was partial or failed: both have a checkpoint at iter 5000 and a log
 - Run order is in `docs/plan.md`. The reviewer-concerns list is in `docs/findings.md`, section 8.
 - Tests: `python -m pytest tests/`, about 15-20 minutes on CPU.
 
+
+## Update: v3 (gated mode, deconfounding data), scope cut to the minimum
+
+- `assembly_s0` ran on the T4. It was healthy but did not beat the dense post-hoc control (mean S 0.187 against 0.158, difference CI -0.035 to +0.092; `docs/findings.md`, section 9). The old dense run is now `results/dense_s0_v2data/`.
+- **The data changed.** About 10% deconfounding data (word problems, stories with numbers, code arithmetic), per-token category tags, and a held-out 5% of arithmetic problems (`deconf.py`). Old runs used the old corpus; `--deconf_frac 0 --holdout_arith 0` rebuilds it.
+- **New mode:** `ROUTING_MODE=gated` with `GATE_GROUPS=fixed|evolved` (notebook: `GROUPS`) and `ROUTE_SMOOTH`. A soft k-WTA over 8 neuron groups in layers 2-5. Fixed and evolved differ only in the group assignment.
+- **New evaluations** for dense (post-hoc groups) and gated runs, run by `run_all.sh`: damage table, failure trace, unlearning by deletion, context sensitivity, and `results/comparison_gated.csv` from `eval/compare.py`.
+- **Diagnostic before any GPU run** (`docs/findings.md`, section 10): in `dense_s0`, digits select different groups in arithmetic than in stories, and number words do not. That follows surface format, not arithmetic function.
+- **Next:** the four seed-0 runs in `docs/plan.md` (dense, gated-fixed, gated-evolved, gated-evolved with `ROUTE_SMOOTH=0`), about 2.5 hours of T4 time in total (estimate). Everything else is listed there as future work.
+- Tests: `python -m pytest tests/`, about 25-30 minutes on CPU. No new dependencies.
