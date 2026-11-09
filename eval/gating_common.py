@@ -39,6 +39,7 @@ def add_args(p, windows=96):
     p.add_argument("--n_groups", type=int, default=8)
     p.add_argument("--gate_k", type=int, default=3)
     p.add_argument("--route_smooth", type=float, default=0.9)
+    p.add_argument("--gate_score", default="share", choices=["share", "relative"])
     p.add_argument("--posthoc_batches", type=int, default=200, help="batches of the first val half for clustering")
     p.add_argument("--knn", type=int, default=32)
     p.add_argument("--resolution", type=float, default=1.0)
@@ -81,7 +82,7 @@ def load(args):
         with open(path, "w") as f:
             json.dump(cached, f)
     router = GateRouter(model, layers=layers, n_groups=args.n_groups, k=args.gate_k, smooth=args.route_smooth,
-                        groups="fixed", cluster_start=0, apply=False)
+                        groups="fixed", cluster_start=0, apply=False, score=args.gate_score)
     for layer in layers:
         router.set_labels(layer, cached["layers"][str(layer)])
         router.set_neuron_ema(layer, cached["neuron_ema"][str(layer)])

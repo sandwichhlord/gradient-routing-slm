@@ -60,6 +60,8 @@ DEFAULTS = dict(
     # route_gamma (balancing bias step), route_ema (activity and correlation EMA) and assembly_sample_tokens
     groups="fixed", n_groups=8, gate_k=3, gate_tau=0.1, route_smooth=0.9, gated_layers="2,3,4,5", max_move=0.05,
     gate_grad=True,   # gradient through the group score into the activations (not the baseline, bias or threshold)
+    gate_score="share",  # share: G * ||h_g|| / sum of all groups' norms; relative: mean |h| / running baseline
+                         # (default chosen by the pre-GPU smoke comparison in docs/plan.md)
     # scales the whole learning rate schedule, e.g. a dense run matched to an assembly run's mean plasticity
     lr_scale=1.0,
 )
@@ -97,6 +99,8 @@ def get_config(argv=None):
         cfg["routing_mode"] = "batch"
     if cfg["plasticity"] not in ("rank", "sigmoid"):
         raise ValueError(f"plasticity={cfg['plasticity']!r}, expected rank or sigmoid")
+    if cfg["gate_score"] not in ("relative", "share"):
+        raise ValueError(f"gate_score={cfg['gate_score']!r}, expected relative or share")
     if cfg["groups"] not in ("fixed", "evolved"):
         raise ValueError(f"groups={cfg['groups']!r}, expected fixed or evolved")
     if cfg["routing_mode"] not in ROUTING_MODES:
@@ -173,7 +177,7 @@ def main(argv=None):
         router = router_from_config(model, c)
         print(f"[train] gated ON: groups={c['groups']}, layers {router.layers}, {c['n_groups']} groups, k={c['gate_k']}, "
               f"tau={c['gate_tau']}, route_smooth={c['route_smooth']}, gamma={c['route_gamma']}, "
-              f"gate_grad={c['gate_grad']}, dense until step "
+              f"gate_grad={c['gate_grad']}, gate_score={c['gate_score']}, dense until step "
               f"{c['cluster_start']}" + (f", re-cluster every {c['cluster_every']} moving at most {c['max_move']:.0%}"
                                          if c["groups"] == "evolved" else ""))
     if mode == "label":

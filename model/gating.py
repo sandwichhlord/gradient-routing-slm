@@ -12,6 +12,10 @@ n_groups groups. For every token:
     gate_g  = sigmoid((score_g - theta) / tau)                     theta: midway between the k-th and (k+1)-th score
     h      <- h * gate (per neuron, from its group)
 
+--gate_score share replaces r_g(t) with each group's share of the layer's activation: G * ||h_g(t)|| / sum_j ||h_j(t)||
+(L2 norms; multiplied by G so the mean score is 1, the same scale as relative activity, which keeps tau meaningful).
+It needs no running baseline, so the gate cannot be raised by inflating every activation.
+
 Selected groups are the top k by score (gate > 0.5). No gradient masking or scaling is added. With gate_grad (the
 default) the gate is differentiable: gradient flows through r_g(t) (and the smoothing) into the activations, so a group
 can learn to raise its activity on tokens where its output helps. It does not flow through the baseline (a running
@@ -172,7 +176,8 @@ class GateRouter:
 
     def __init__(self, model, layers=(2, 3, 4, 5), n_groups=8, k=3, tau=0.1, gamma=0.001, smooth=0.9, groups="fixed",
                  cluster_start=500, cluster_every=500, knn=32, resolution=1.0, min_size=16, max_move=0.05, ema=0.99,
-                 sample_tokens=512, seed=0, apply=True, eot=50256, gate_grad=True):
+                 sample_tokens=512, seed=0, apply=True, eot=50256, gate_grad=True, score="relative"):
+        assert score in ("relative", "share"), score
         assert groups in ("fixed", "evolved"), groups
         assert 1 <= k <= n_groups, f"gate_k={k} must be in [1, n_groups={n_groups}]"
         assert 0.0 <= smooth < 1.0, f"route_smooth={smooth} must be in [0, 1)"
@@ -181,7 +186,7 @@ class GateRouter:
         self.pos = {layer: i for i, layer in enumerate(self.layers)}
         self.hidden = mlps[0].n_blocks * mlps[0].block_dim
         self.G, self.k, self.tau, self.gamma, self.smooth = n_groups, k, tau, gamma, smooth
-        self.groups, self.apply, self.eot, self.gate_grad = groups, apply, eot, gate_grad
+        self.groups, self.apply, self.eot, self.gate_grad, self.score = groups, apply, eot, gate_grad, score
         self.cluster_start, self.cluster_every = cluster_start, cluster_every
         self.knn, self.resolution, self.min_size, self.max_move, self.seed = knn, resolution, min_size, max_move, seed
         self.device = model.lm_head.weight.device
@@ -247,10 +252,15 @@ class GateRouter:
         """(B, T, G) smoothed relative activity plus bias, in float32."""
         layer = self.layers[i]
         idx, sizes = self.index[i], self.sizes[i]
-        habs = (h if self.gate_grad else h.detach()).float().abs()
-        activity = torch.zeros(*habs.shape[:-1], self.G, device=h.device).index_add_(-1, idx, habs) / sizes
-        baseline = torch.zeros(self.G, device=h.device).index_add_(0, idx, self.tracker.neuron_ema[layer].detach()) / sizes
-        r = activity / baseline.clamp_min(1e-8)
+        hf = (h if self.gate_grad else h.detach()).float()
+        if self.score == "share":
+            sq = torch.zeros(*hf.shape[:-1], self.G, device=h.device).index_add_(-1, idx, hf * hf)
+            norms = (sq + 1e-12).sqrt()                       # eps: finite gradient for a silent group
+            r = self.G * norms / norms.sum(dim=-1, keepdim=True)
+        else:
+            activity = torch.zeros(*hf.shape[:-1], self.G, device=h.device).index_add_(-1, idx, hf.abs()) / sizes
+            baseline = torch.zeros(self.G, device=h.device).index_add_(0, idx, self.tracker.neuron_ema[layer].detach()) / sizes
+            r = activity / baseline.clamp_min(1e-8)
         if self.smooth > 0:
             r = self._smoothing() @ r
         return r + self.bias[i]
@@ -386,7 +396,7 @@ class GateRouter:
 
     def write_summary(self, path):
         lines = [f"mode: gated, groups={self.groups}, layers={self.layers}, n_groups={self.G}, k={self.k}, tau={self.tau}, "
-                 f"route_smooth={self.smooth}, gamma={self.gamma}, gate_grad={self.gate_grad}",
+                 f"route_smooth={self.smooth}, gamma={self.gamma}, gate_grad={self.gate_grad}, gate_score={self.score}",
                  f"steps: {self.steps}, gating from step {self.cluster_start}, clusterings: {self.n_clusterings}"]
         for i, layer in enumerate(self.layers):
             sizes = np.bincount(self.labels[i], minlength=self.G).tolist() if self.labels[i] is not None else None
@@ -427,7 +437,7 @@ def router_from_config(model, c, apply=True):
                       cluster_start=c["cluster_start"], cluster_every=c["cluster_every"], knn=c["knn"],
                       resolution=c["resolution"], min_size=c["min_size"], max_move=c["max_move"], ema=c["route_ema"],
                       sample_tokens=c["assembly_sample_tokens"], seed=c["seed"], apply=apply,
-                      gate_grad=bool(c.get("gate_grad", True)))
+                      gate_grad=bool(c.get("gate_grad", True)), score=c.get("gate_score", "relative"))
 
 
 # ------------------------------------------------------------------------------ post-hoc groups (dense models)

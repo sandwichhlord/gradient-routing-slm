@@ -93,6 +93,7 @@ python eval/compare.py                                      # results/comparison
 | Variable | Meaning |
 |---|---|
 | `ROUTING_MODE` | `dense` (default), `gated`, `batch`, `token`, `label`, `assembly` |
+| `GATE_SCORE` | Gated mode: `share` (default) or `relative`. `relative` adds `_relative` to the folder |
 | `GATE_GRAD` | Gated mode: `1` (default) gradient through the group scores, `0` detached. `0` adds `_gg0` to the folder |
 | `GATE_GROUPS` | Gated mode: `fixed` (default) or `evolved`. Folder `out_gated_<groups>_s<seed>`. (Not `GROUPS`: bash reserves that name.) |
 | `ROUTE_SMOOTH` | Gated mode: causal smoothing of group scores, default `0.9`. Other values get their own folder, e.g. `out_gated_evolved_sm0_s0` |
@@ -137,6 +138,7 @@ The notebook prints `DATA MODE: real` near the end. Any other value means the Hu
 | `eval/failure_trace.py` | 2000 held-out arithmetic problems: which groups are active on wrong answers, their consistency, and accuracy against story/code loss when they are ablated |
 | `eval/unlearn.py` | Deletes the groups traced to arithmetic: accuracy and story/code loss before and after, against random deletions of the same size |
 | `eval/context_sensitivity.py` | Jaccard distance between the groups the same digit or number word selects in arithmetic and in stories, at `route_smooth` 0 and 0.9 |
+| `eval/gating_cost.py` | Loss cost of applying the gates at inference to an ungated checkpoint, for several k and both scores |
 | `eval/gating_common.py` | Shared by the four above: post-hoc groups for dense checkpoints, tagged eval sets, greedy arithmetic answers |
 | `eval/ablate.py` | `out/ablation.csv`, `ablation_heatmap.png`, `ablation_summary.txt`, `block_norms.csv`. Before the sweep it asserts that the mask actually changes the logits. |
 
@@ -160,13 +162,13 @@ There are six modes. `gated` (v3) is the current method, and the only one that c
 
 `--routing_mode gated --groups fixed|evolved`. In each layer of `--gated_layers` (default `2,3,4,5`; other layers stay dense) the 1536 hidden neurons form `--n_groups` (8) groups. For every token $t$ and group $g$:
 
-1. **Relative activity.** $r_g(t)$ is the mean $|h|$ over the group's neurons, divided by the mean over its members of each neuron's running mean $|h|$ (EMA, decay 0.99, updated after the gates are computed, so a batch never sees its own statistics).
+1. **Group score** (default `share`, see the Score note below; shown here for `relative`). $r_g(t)$ is the mean $|h|$ over the group's neurons, divided by the mean over its members of each neuron's running mean $|h|$ (EMA, decay 0.99, updated after the gates are computed, so a batch never sees its own statistics).
 2. **Causal smoothing** (`--route_smooth`, $\beta = 0.9$): $s_g(t) = \beta\, s_g(t-1) + (1-\beta)\, r_g(t)$, restarted at the sequence start and after every `<|endoftext|>`. A test checks that changing token $t+1$ never changes a gate at $t$.
 3. **Balancing bias** (DeepSeek style, $\gamma = 0.001$): after each step, $b_g$ goes down if the group was in the top $k$ for more than $k/G$ of the tokens, and up otherwise.
 4. **Soft k-WTA** ($k = 3$, $\tau = 0.1$): with $\theta$ midway between the $k$-th and $(k+1)$-th largest $s_g + b_g$,
    $$\text{gate}_g(t) = \sigma\big((s_g(t) + b_g - \theta)/\tau\big), \qquad h \leftarrow h \odot \text{gate}.$$
    The selected groups are the top $k$ (gate above 0.5). There is no gradient masking or scaling. With `--gate_grad 1` (default) the gate is differentiable: gradient flows through $r_g(t)$ and the smoothing into the activations, so a group can learn to raise its activity where its output helps. It does not flow through the baseline, the bias or $\theta$. With `--gate_grad 0` the scores use $h$ detached and the gate is a constant multiplier. With $k = G$ every gate is exactly 1, and a test checks that this equals the ungated model.
-   On a 300-step CPU smoke run, `--gate_grad 1` raised the gated layers' activation norms to about 3.6x dense (0.78 to 2.85 in layer 0, levelling off) and story loss by 24%. `--gate_grad 0` matched dense. Watch `act_norm_l*` in the first GPU run; `GATE_GRAD=0` is the fallback.
+   **Score** (`--gate_score`): `share` (default) uses $G\,\lVert h_g(t)\rVert / \sum_j \lVert h_j(t)\rVert$, each group's share of the layer's activation norm, scaled so the mean is 1. It needs no baseline and is unchanged when every activation is scaled. `relative` uses $r_g(t)$ from step 1. In a 300-step smoke comparison, gate gradient with `relative` drove activation norms to 3.7x dense and story loss up 24%; with `share` the worst was 1.2x and +3.9%, so `share` became the default (`docs/plan.md`, pre-GPU design decision).
 
 **Groups.** `fixed`: 8 contiguous groups of 192. `evolved`: co-activation correlations (as in assembly mode), Leiden, then merge or split to exactly 8 groups. The first clustering at step `--cluster_start` (500) installs the partition. Every `--cluster_every` (500) steps after that, at most `--max_move` (5%) of the neurons move towards Leiden's new proposal. Neurons with the largest gain in mean correlation move first, and no group drops below `--min_size` (16). So groups keep their IDs and grow or shrink slowly. Both kinds train dense for the first 500 steps and differ only in the group assignment, which a test checks.
 

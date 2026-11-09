@@ -235,3 +235,19 @@ Contexts: digits in arithmetic lines (`Q: 37 + 48 = A: 85`) against digits in nu
 So most of the large digit effect came from the Q/A format. In prose, the dense model routes the same digit almost the same way in arithmetic and in stories. The exception is layer 3 with smoothing, where some context sensitivity remains. The pre-registered criteria in `docs/plan.md` therefore use only the matched comparisons for functional claims.
 
 **What to look for in the trained runs.** The matched effects are the informative ones. If gated training with deconfounding data makes word problems and prose arithmetic route away from stories, that is functional routing. The damage table checks the same thing by ablation (functional against lexical groups). The `gated_evolved` run at `route_smooth=0` tests whether smoothing matters during training, not only at inference.
+
+## 11. Inference-only gating cost on dense_s0 (before any GPU run)
+
+`eval/gating_cost.py` on the old dense run (`results/dense_s0_v2data/ckpt.pt`), CPU. The same post-hoc groups as section 10 (8 per layer, layers 2-5). The soft k-WTA gates (tau 0.1, route_smooth 0.9, bias 0) are applied to the forward pass of a model that never trained with them. Per-domain val loss on the second half of the small real-data sample, 64 windows of 256 tokens per domain (the sample overlaps this model's training data). Files in `results/dense_s0_v2data/gating_cost/`.
+
+| Score, k of 8 | Story | Math | Code |
+|---|---|---|---|
+| ungated | 2.305 | 1.464 | 2.418 |
+| relative, k=2 | 2.801 (+21.5%) | 2.130 (+45.6%) | 3.029 (+25.3%) |
+| relative, k=3 | 2.658 (+15.3%) | 1.923 (+31.4%) | 2.848 (+17.8%) |
+| relative, k=4 | 2.561 (+11.1%) | 1.787 (+22.1%) | 2.739 (+13.3%) |
+| share, k=2 | 2.728 (+18.3%) | 2.058 (+40.6%) | 2.997 (+24.0%) |
+| share, k=3 (the default) | 2.556 (+10.9%) | 1.752 (+19.7%) | 2.745 (+13.5%) |
+| share, k=4 | 2.459 (+6.7%) | 1.609 (+9.9%) | 2.605 (+7.7%) |
+
+**What this shows.** The dense model does not already keep its useful MLP output in 3 of 8 groups per token: gating it without training costs 11-20% loss at the default setting. The cost falls steadily with k, and the share score costs less than the relative score at every k. Math is hit hardest at every setting. So the gated runs must learn to work with the gates; at step 500, when gating switches on, a loss jump of roughly this size is expected. Soft gates leak (unselected groups keep part of their output), so a hard top-k would cost more.

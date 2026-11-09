@@ -1,0 +1,10 @@
+inference-only gating on posthoc groups, layers [2, 3, 4, 5], 8 groups, tau 0.1, route_smooth 0.9, 64 windows per domain
+                             story              math              code
+ungated                     2.3052            1.4636            2.4180
+relative k=2        2.8007 (+21.5%)    2.1303 (+45.6%)    3.0290 (+25.3%)
+relative k=3        2.6581 (+15.3%)    1.9225 (+31.4%)    2.8476 (+17.8%)
+relative k=4        2.5610 (+11.1%)    1.7868 (+22.1%)    2.7386 (+13.3%)
+share k=2           2.7281 (+18.3%)    2.0579 (+40.6%)    2.9974 (+24.0%)
+share k=3           2.5563 (+10.9%)    1.7519 (+19.7%)    2.7450 (+13.5%)
+share k=4           2.4586 ( +6.7%)    1.6091 ( +9.9%)    2.6045 ( +7.7%)
+time: 378s
