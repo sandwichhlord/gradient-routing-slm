@@ -161,6 +161,30 @@ def test_no_nan_with_a_silent_group_and_dead_neurons():
     assert not r.last_selected[0][..., 3].any()        # a silent group never wins
 
 
+def test_gate_gradient_reaches_activations_only_with_gate_grad():
+    """With gate_grad the gate itself is differentiable (the c_fc gradient changes); without it, the gate is a constant
+    multiplier. The threshold, baseline and bias never receive gradient."""
+    grads = {}
+    for gg in (True, False):
+        model = fresh_model().train()
+        r = gated(model, k=3, gate_grad=gg)
+        x = tokens()
+        model(x, x)[1].backward()
+        grads[gg] = model.mlps()[2].c_fc.weight.grad.clone()
+        assert all(torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None)
+        assert not r.bias.requires_grad and not r.tracker.neuron_ema[2].requires_grad
+        assert not r.last_gate[1].requires_grad      # the recorded copy is detached
+    assert not torch.allclose(grads[True], grads[False])
+
+
+def test_gate_grad_does_not_change_the_forward_pass():
+    a, b = fresh_model().eval(), fresh_model().eval()
+    gated(a, gate_grad=True)
+    gated(b, gate_grad=False)
+    x = tokens()
+    assert torch.equal(a(x, x)[0], b(x, x)[0])
+
+
 def test_bias_moves_against_over_selected_groups_and_is_not_a_parameter():
     model = fresh_model().train()
     r = gated(model, k=3)
@@ -218,6 +242,9 @@ def test_tags_on_known_text():
     math = dict(tags("Q: 37 + 48 = A: 85\nQ: 7 - 12 = A: -5", "math"))
     assert math[" 85"] == math["5"] == "digit_in_arith_answer"
     assert math[" 37"] == math[" 48"] == math[" 12"] == "other"
+    prose = tags("Q: 1 + 2 = A: 3\nMia added 37 and 48 and got 85.\nQ: 4 + 5 = A: 9", "math")
+    assert [t for tok, t in prose if tok in (" 37", " 48", " 85")] == ["digit_in_prose_arith"] * 3
+    assert dict(prose)[" 1"] == "other" and dict(prose)[" 9"] == "digit_in_arith_answer"
     wp = dict(tags("Three plus four makes seven.", "math"))
     assert wp["Three"] == wp[" four"] == wp[" seven"] == "number_word_in_word_problem" and wp[" plus"] == "other"
     story = dict(tags("Mia was 7 and had three cats.", "story"))
@@ -302,18 +329,21 @@ def test_smoke_run_all_gated(groups, gated_runs):
     assert all(np.isfinite(float(r[f"val_{d}"])) for r in metrics for d in ("story", "math", "code"))
     layers = list(csv.DictReader(open(out / "gating_layers.csv", newline="")))
     last = [r for r in layers if r["iter"] == metrics[-1]["iter"]]
-    assert len(last) == 2 and all(r["ctx_digits_effect"] != "" for r in last)
+    assert len(last) == 2 and all(r[f"ctx_{n}_effect"] != "" for r in last
+                                  for n in ("number_words", "prose_digits", "qa_digits"))
     if groups == "evolved":
         assert all(int(r["moved_last"]) <= int(0.05 * 256) for r in last) and int(last[0]["n_clusterings"]) >= 2
     damage = json.load(open(out / "damage_summary.json"))
     assert damage["source"] == f"trained-{groups}" and damage["n_groups"] == 16
-    assert sum(damage["classes"].values()) == 16
+    assert sum(damage["classes"].values()) == 16 == sum(damage["format_classes"].values())
+    assert "tag_digit_in_prose_arith" in damage["mean_damage"]
     trace = json.load(open(out / "failure_trace_summary.json"))
     assert trace["n_problems"] == 100 and len(trace["top_groups"]) == 3 and len(trace["ablation"]) == 4
     unlearn = json.load(open(out / "unlearn_summary.json"))
     assert len(unlearn["deleted_groups"]) == 3 and set(unlearn["before"]) == {"accuracy", "story", "math", "code"}
     ctx = json.load(open(out / "context_sensitivity.json"))
     assert set(ctx["results"]) == {"0.0", "0.9"} and ctx["trained_route_smooth"] == 0.9
+    assert ctx["pair_kind"] == {"number_words": "matched", "prose_digits": "matched", "qa_digits": "format"}
 
 
 def test_load_checkpoint_restores_the_gates(gated_runs):
@@ -335,7 +365,26 @@ def test_compare_writes_the_gated_table(gated_runs, tmp_path):
     rows = {r["group"]: r for r in csv.DictReader(open(results / "comparison_gated.csv", newline=""))}
     assert set(rows) == {"gated_fixed", "gated_evolved"}
     for r in rows.values():
-        assert r["val_story"] != "" and r["arith_acc"] != "" and r["ctx_digits_s0.9"] != "" and r["unlearn_d_story"] != ""
+        assert r["val_story"] != "" and r["arith_acc"] != "" and r["ctx_prose_digits_s0.9"] != ""
+        assert r["unlearn_d_story"] != "" and r["format_ctx_qa_digits_s0.9"] != "" and r["format_n_functional"] != ""
+    assert rows["gated_fixed"]["groups_near_equal"] == "1.0000"          # fixed groups are exactly equal
+    sizes = list(csv.DictReader(open(results / "group_sizes.csv", newline="")))
+    assert {r["run"] for r in sizes} == {"gated_fixed_s0", "gated_evolved_s0"} and len(sizes) == 4
+
+
+def test_compare_flags_evolved_groups_that_stay_near_equal(tmp_path):
+    results = tmp_path / "results"
+    for name, labels in (("gated_evolved_s0", np.repeat(np.arange(8), 32)),
+                         ("gated_evolved_s1", np.concatenate([np.zeros(100), np.repeat(np.arange(1, 8), 22)[:156]]))):
+        d = results / name
+        d.mkdir(parents=True)
+        (d / "metrics.csv").write_text("iter,train_loss,val_story,val_math,val_code,lr,elapsed_s,tokens_per_sec\n"
+                                       "100,1,3.0,2.0,2.5,1e-4,10,40000\n")
+        (d / "damage_summary.json").write_text("{}")
+        (d / "groups_final.json").write_text(json.dumps({"n_groups": 8, "layers": {"0": labels.astype(int).tolist()}}))
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "eval", "compare.py"), "--results_dir", str(results)],
+                       check=True, capture_output=True, text=True)
+    assert "FLAG: gated_evolved_s0" in r.stdout and "FLAG: gated_evolved_s1" not in r.stdout
 
 
 def test_smoothing_and_groups_name_the_output_folder():

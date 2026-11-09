@@ -59,6 +59,7 @@ DEFAULTS = dict(
     # gated mode (v3). Shares cluster_start (gating starts, dense before), cluster_every, knn, resolution, min_size,
     # route_gamma (balancing bias step), route_ema (activity and correlation EMA) and assembly_sample_tokens
     groups="fixed", n_groups=8, gate_k=3, gate_tau=0.1, route_smooth=0.9, gated_layers="2,3,4,5", max_move=0.05,
+    gate_grad=True,   # gradient through the group score into the activations (not the baseline, bias or threshold)
     # scales the whole learning rate schedule, e.g. a dense run matched to an assembly run's mean plasticity
     lr_scale=1.0,
 )
@@ -171,7 +172,8 @@ def main(argv=None):
     elif mode == "gated":
         router = router_from_config(model, c)
         print(f"[train] gated ON: groups={c['groups']}, layers {router.layers}, {c['n_groups']} groups, k={c['gate_k']}, "
-              f"tau={c['gate_tau']}, route_smooth={c['route_smooth']}, gamma={c['route_gamma']}, dense until step "
+              f"tau={c['gate_tau']}, route_smooth={c['route_smooth']}, gamma={c['route_gamma']}, "
+              f"gate_grad={c['gate_grad']}, dense until step "
               f"{c['cluster_start']}" + (f", re-cluster every {c['cluster_every']} moving at most {c['max_move']:.0%}"
                                          if c["groups"] == "evolved" else ""))
     if mode == "label":

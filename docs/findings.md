@@ -224,4 +224,14 @@ Contexts: digits in arithmetic lines (`Q: 37 + 48 = A: 85`) against digits in nu
 
 **Caveats.** `dense_s0` never trained on word problems or number stories. The probes are generated text from `deconf.py`. The clustering sample is the start of the HuggingFace streams, which `dense_s0` trained on. Selections come from a model that never trained with gates, with zero bias. One checkpoint, 11 number-word ids. Files are in `results/dense_s0_v2data/context_diag/`.
 
-**What to look for in the trained runs.** The number-word effect is the informative one. If gated training with deconfounding data makes word problems route away from stories while digits in stories do not, that is functional routing. The damage table checks the same thing by ablation (functional against lexical groups). The `gated_evolved` run at `route_smooth=0` tests whether smoothing matters during training, not only at inference.
+**Rerun with format-matched digits (same checkpoint, same groups).** v3 then added prose arithmetic with digits ("Mia added 37 and 48 and got 85."), so digits can be compared prose against prose. Mean effect over layers 2-5 (files in `results/dense_s0_v2data/context_diag_matched/`; the number-word probes were regenerated, so they differ slightly from the table above):
+
+| Comparison | Kind | Smooth 0 | Smooth 0.9 |
+|---|---|---|---|
+| Number words: word problems vs stories | matched | +0.044 | +0.039 |
+| Digits: prose arithmetic vs stories | matched | +0.026 | +0.083 (layer 3: +0.210, others +0.03 to +0.05) |
+| Digits: Q/A lines vs stories | format | +0.214 | +0.521 |
+
+So most of the large digit effect came from the Q/A format. In prose, the dense model routes the same digit almost the same way in arithmetic and in stories. The exception is layer 3 with smoothing, where some context sensitivity remains. The pre-registered criteria in `docs/plan.md` therefore use only the matched comparisons for functional claims.
+
+**What to look for in the trained runs.** The matched effects are the informative ones. If gated training with deconfounding data makes word problems and prose arithmetic route away from stories, that is functional routing. The damage table checks the same thing by ablation (functional against lexical groups). The `gated_evolved` run at `route_smooth=0` tests whether smoothing matters during training, not only at inference.

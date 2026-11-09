@@ -11,7 +11,7 @@ Outputs (in --out_dir, default data/out/):
 Every document is followed by the GPT-2 <|endoftext|> token.
 
 Deconfounding data (--deconf_frac, default 0.1): synthetic word problems (math), number stories (story) and code
-arithmetic (code), in total deconf_frac x the real budget, a third each, split into train and val like the real data.
+arithmetic (code), plus prose arithmetic with digits (math), in total deconf_frac x the real budget, a third each, split into train and val like the real data.
 --holdout_arith (default 1) keeps a fixed ~5% of arithmetic problems out of training (deconf.is_heldout).
 --deconf_frac 0 --holdout_arith 0 rebuilds the v0-v2 corpus exactly.
 
@@ -30,7 +30,7 @@ import numpy as np
 import tiktoken
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from deconf import TAGS, deconf_docs_iter, math_docs_iter, math_line, tag_tokens  # noqa: E402,F401
+from deconf import DATA_VERSION, TAGS, deconf_docs_iter, math_docs_iter, math_line, tag_tokens  # noqa: E402,F401
 
 DOMAINS = ["story", "math", "code"]
 
@@ -212,6 +212,8 @@ def main():
     os.makedirs(args.out_dir, exist_ok=True)
 
     signature = {k: v for k, v in vars(args).items() if k not in ("out_dir", "force")}
+    if args.deconf_frac > 0 or args.holdout_arith:
+        signature["deconf_version"] = DATA_VERSION   # generated data or tags changed: rebuild
     meta_path = os.path.join(args.out_dir, "meta.json")
     needed = (["train.bin", "train_domain.bin", "train_tags.bin"]
               + [f"val_{d}{x}.bin" for d in DOMAINS for x in ("", "_tags")])

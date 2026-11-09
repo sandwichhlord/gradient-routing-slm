@@ -93,6 +93,7 @@ python eval/compare.py                                      # results/comparison
 | Variable | Meaning |
 |---|---|
 | `ROUTING_MODE` | `dense` (default), `gated`, `batch`, `token`, `label`, `assembly` |
+| `GATE_GRAD` | Gated mode: `1` (default) gradient through the group scores, `0` detached. `0` adds `_gg0` to the folder |
 | `GATE_GROUPS` | Gated mode: `fixed` (default) or `evolved`. Folder `out_gated_<groups>_s<seed>`. (Not `GROUPS`: bash reserves that name.) |
 | `ROUTE_SMOOTH` | Gated mode: causal smoothing of group scores, default `0.9`. Other values get their own folder, e.g. `out_gated_evolved_sm0_s0` |
 | `RESOLUTION`, `FLOOR`, `PLASTICITY` | Assembly settings, defaults `1.0`, `0.1`, `rank`. Other values get their own folder, e.g. `out_assembly_r0.5_s0` |
@@ -131,7 +132,7 @@ The notebook prints `DATA MODE: real` near the end. Any other value means the Hu
 | `eval/ablate_assemblies.py` | Ablates each assembly, from a run's final partition or post hoc on any checkpoint: S, size- and damage-weighted S, size-matched random baseline, bootstrap CIs |
 | `eval/assembly_probe.py` | `assembly_probe.csv` (top tokens, correlation with position and token frequency) and `assembly_domain_profile.csv` |
 | `eval/assembly_health_plot.py` | `assembly_health.png`: number of assemblies and ARI over training |
-| `eval/compare.py` | `results/comparison.csv` and `comparison.png`: final loss, mean S and speed per run, mean and std across seeds. `comparison_gated.csv`: dense / fixed / evolved on every v3 evaluation |
+| `eval/compare.py` | `results/comparison.csv` and `comparison.png`: final loss, mean S and speed per run, mean and std across seeds. `comparison_gated.csv`: dense / fixed / evolved on every v3 evaluation (format-matched rows first, `format_*` rows separate). `group_sizes.csv`: min / median / max group size per layer, flagging evolved runs that stay within 20% of equal size |
 | `eval/damage_table.py` | Ablates each group: loss increase per token category, size-matched random groups, lexical / functional / other classes |
 | `eval/failure_trace.py` | 2000 held-out arithmetic problems: which groups are active on wrong answers, their consistency, and accuracy against story/code loss when they are ablated |
 | `eval/unlearn.py` | Deletes the groups traced to arithmetic: accuracy and story/code loss before and after, against random deletions of the same size |
@@ -143,8 +144,8 @@ The notebook prints `DATA MODE: real` near the end. Any other value means the Hu
 - **Stories:** `roneneldan/TinyStories`, streamed (`--story_tokens`, default 20M).
 - **Math:** synthetic lines such as `Q: 347 x 58 = A: 20126`. Operators are + - x, with 1–3 digit operands, grouped 20 lines per document (`--math_tokens`, default 10M).
 - **Code:** `codeparrot/codeparrot-clean-valid`, field `content`, streamed. Files are capped at 4096 tokens (`--code_tokens`, default 10M).
-- **Deconfounding data** (`--deconf_frac`, default 0.1 of the real budget, a third each, `deconf.py`): word problems in words (math, "three plus four makes seven"), stories with numbers (story, "Mia was 7 and had 3 cats"), and short code doing arithmetic (code, `x = 37 + 48`).
-- **Category tags** per token, for evaluation only: `digit_in_arith_answer`, `digit_in_story`, `number_word_in_word_problem`, `story_word`, `code_keyword_or_indent`, `other`.
+- **Deconfounding data** (`--deconf_frac`, default 0.1 of the real budget, a third per domain, `deconf.py`): word problems in words and prose arithmetic with digits, mixed line by line (math: "three plus four makes seven", "She added 37 and 48 and got 85."), stories with numbers (story, "Mia was 7 and had 3 cats"), and short code doing arithmetic (code, `x = 37 + 48`).
+- **Category tags** per token, for evaluation only: `digit_in_arith_answer` (Q/A lines), `digit_in_story`, `number_word_in_word_problem`, `story_word`, `code_keyword_or_indent`, `digit_in_prose_arith`, `other`.
 - **Held-out arithmetic** (`--holdout_arith`, default 1): a fixed 5% of problems never appear in training; the failure trace and unlearning test on them. `--deconf_frac 0 --holdout_arith 0` rebuilds the v0-v2 corpus exactly.
 - `--synthetic` generates tiny template-based fake data for all 3 domains. The script also falls back to this automatically, with a loud warning, if the HuggingFace download fails.
 
@@ -164,17 +165,18 @@ There are six modes. `gated` (v3) is the current method, and the only one that c
 3. **Balancing bias** (DeepSeek style, $\gamma = 0.001$): after each step, $b_g$ goes down if the group was in the top $k$ for more than $k/G$ of the tokens, and up otherwise.
 4. **Soft k-WTA** ($k = 3$, $\tau = 0.1$): with $\theta$ midway between the $k$-th and $(k+1)$-th largest $s_g + b_g$,
    $$\text{gate}_g(t) = \sigma\big((s_g(t) + b_g - \theta)/\tau\big), \qquad h \leftarrow h \odot \text{gate}.$$
-   The selected groups are the top $k$ (gate above 0.5). Scores use $h$ detached, and there is no gradient masking or scaling: the gate is an ordinary forward multiplier. With $k = G$ every gate is exactly 1, and a test checks that this equals the ungated model.
+   The selected groups are the top $k$ (gate above 0.5). There is no gradient masking or scaling. With `--gate_grad 1` (default) the gate is differentiable: gradient flows through $r_g(t)$ and the smoothing into the activations, so a group can learn to raise its activity where its output helps. It does not flow through the baseline, the bias or $\theta$. With `--gate_grad 0` the scores use $h$ detached and the gate is a constant multiplier. With $k = G$ every gate is exactly 1, and a test checks that this equals the ungated model.
+   On a 300-step CPU smoke run, `--gate_grad 1` raised the gated layers' activation norms to about 3.6x dense (0.78 to 2.85 in layer 0, levelling off) and story loss by 24%. `--gate_grad 0` matched dense. Watch `act_norm_l*` in the first GPU run; `GATE_GRAD=0` is the fallback.
 
 **Groups.** `fixed`: 8 contiguous groups of 192. `evolved`: co-activation correlations (as in assembly mode), Leiden, then merge or split to exactly 8 groups. The first clustering at step `--cluster_start` (500) installs the partition. Every `--cluster_every` (500) steps after that, at most `--max_move` (5%) of the neurons move towards Leiden's new proposal. Neurons with the largest gain in mean correlation move first, and no group drops below `--min_size` (16). So groups keep their IDs and grow or shrink slowly. Both kinds train dense for the first 500 steps and differ only in the group assignment, which a test checks.
 
 **Logs.** `gating.csv` (per group at each eval: size, selection share overall and per domain label, bias, mean gate), `gating_layers.csv` (per layer: neurons moved, ARI, sizes, and the context-sensitivity metric on fixed probes), `groups_final.json`, `summary.txt`.
 
 **Evaluations** (dense checkpoints use post-hoc groups: same clustering on the first val half, inference-only gating that leaves the forward pass dense):
-- `eval/damage_table.py`: zero each group, loss increase per token category, against 3 size-matched random sets per group. A group damages a category when the increase is above 0.01 nats and above the 95th percentile of the random sets in its layer. *Lexical*: damages arithmetic-answer digits and story digits. *Functional*: damages arithmetic-answer digits and number words in word problems, not story digits.
+- `eval/damage_table.py`: zero each group, loss increase per token category, against 3 size-matched random sets per group. A group damages a category when the increase is above 0.01 nats and above the 95th percentile of the random sets in its layer. Primary, format-matched classes (all prose): *lexical* damages prose-arithmetic digits and story digits; *functional* damages prose-arithmetic digits and number words in word problems, not story digits. The same rules with Q/A answer digits are reported separately as "format" classes.
 - `eval/failure_trace.py`: 2000 held-out problems, greedy answers. Each group's selection rate on the answer positions of wrong against right answers, its consistency (share of failures where it is active), and accuracy against story/code loss when the top 3 groups are ablated.
 - `eval/unlearn.py`: delete the 3 groups most selective for arithmetic answers over story and code tokens; accuracy and story/code loss before and after, against same-size random deletions.
-- `eval/context_sensitivity.py`: for digits (arithmetic against stories) and number words (word problems against stories), the Jaccard distance between the groups the same token selects in the two contexts, minus the distance between two occurrences in one context. Run at `route_smooth` 0 and 0.9.
+- `eval/context_sensitivity.py`: the Jaccard distance between the groups the same token selects in two contexts, minus the distance between two occurrences in one context, at `route_smooth` 0 and 0.9. Primary (format-matched, prose against prose): number words in word problems against stories, digits in prose arithmetic against stories. Labelled "format": digits in Q/A lines against stories.
 
 ### Assembly mode (v2)
 

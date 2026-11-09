@@ -12,9 +12,12 @@ n_groups groups. For every token:
     gate_g  = sigmoid((score_g - theta) / tau)                     theta: midway between the k-th and (k+1)-th score
     h      <- h * gate (per neuron, from its group)
 
-Selected groups are the top k by score (gate > 0.5). The gate is a plain forward multiplier: no gradient masking or
-scaling is added, and scores are computed from h.detach(), so the gate itself gets no gradient. With k = n_groups the
-(k+1)-th score is -inf, every gate is exactly 1 and the layer is the dense layer.
+Selected groups are the top k by score (gate > 0.5). No gradient masking or scaling is added. With gate_grad (the
+default) the gate is differentiable: gradient flows through r_g(t) (and the smoothing) into the activations, so a group
+can learn to raise its activity on tokens where its output helps. It does not flow through the baseline (a running
+mean), the balancing bias or the threshold theta (both treated as constants). With gate_grad off, scores come from
+h.detach() and the gate is a constant multiplier. With k = n_groups the (k+1)-th score is -inf, every gate is exactly 1
+and the layer is the dense layer.
 
 Groups:
   fixed    contiguous equal-size groups
@@ -39,9 +42,9 @@ from model.assemblies import LEFTOVER, CoactivationTracker, adjusted_rand_index,
 
 DOMAINS = ["story", "math", "code"]
 GROUP_FIELDS = ["iter", "layer", "group", "size", "sel_frac", *[f"sel_{d}" for d in DOMAINS], "bias", "mean_gate"]
+CTX_NAMES = ["number_words", "prose_digits", "qa_digits"]   # deconf.PROBE_PAIRS; qa_digits is the "format" comparison
 LAYER_FIELDS = ["iter", "layer", "n_clusterings", "moved_last", "moved_total", "stability_ari", "size_min", "size_max",
-                "largest_frac", "ctx_digits_cross", "ctx_digits_within", "ctx_digits_effect", "ctx_number_words_cross",
-                "ctx_number_words_within", "ctx_number_words_effect"]
+                "largest_frac", *[f"ctx_{n}_{k}" for n in CTX_NAMES for k in ("cross", "within", "effect")]]
 
 
 def parse_layers(spec, n_layer):
@@ -169,7 +172,7 @@ class GateRouter:
 
     def __init__(self, model, layers=(2, 3, 4, 5), n_groups=8, k=3, tau=0.1, gamma=0.001, smooth=0.9, groups="fixed",
                  cluster_start=500, cluster_every=500, knn=32, resolution=1.0, min_size=16, max_move=0.05, ema=0.99,
-                 sample_tokens=512, seed=0, apply=True, eot=50256):
+                 sample_tokens=512, seed=0, apply=True, eot=50256, gate_grad=True):
         assert groups in ("fixed", "evolved"), groups
         assert 1 <= k <= n_groups, f"gate_k={k} must be in [1, n_groups={n_groups}]"
         assert 0.0 <= smooth < 1.0, f"route_smooth={smooth} must be in [0, 1)"
@@ -178,7 +181,7 @@ class GateRouter:
         self.pos = {layer: i for i, layer in enumerate(self.layers)}
         self.hidden = mlps[0].n_blocks * mlps[0].block_dim
         self.G, self.k, self.tau, self.gamma, self.smooth = n_groups, k, tau, gamma, smooth
-        self.groups, self.apply, self.eot = groups, apply, eot
+        self.groups, self.apply, self.eot, self.gate_grad = groups, apply, eot, gate_grad
         self.cluster_start, self.cluster_every = cluster_start, cluster_every
         self.knn, self.resolution, self.min_size, self.max_move, self.seed = knn, resolution, min_size, max_move, seed
         self.device = model.lm_head.weight.device
@@ -244,9 +247,9 @@ class GateRouter:
         """(B, T, G) smoothed relative activity plus bias, in float32."""
         layer = self.layers[i]
         idx, sizes = self.index[i], self.sizes[i]
-        habs = h.detach().float().abs()
+        habs = (h if self.gate_grad else h.detach()).float().abs()
         activity = torch.zeros(*habs.shape[:-1], self.G, device=h.device).index_add_(-1, idx, habs) / sizes
-        baseline = torch.zeros(self.G, device=h.device).index_add_(0, idx, self.tracker.neuron_ema[layer]) / sizes
+        baseline = torch.zeros(self.G, device=h.device).index_add_(0, idx, self.tracker.neuron_ema[layer].detach()) / sizes
         r = activity / baseline.clamp_min(1e-8)
         if self.smooth > 0:
             r = self._smoothing() @ r
@@ -256,10 +259,10 @@ class GateRouter:
         """(gate, selected) for scores s (..., G)."""
         if self.k >= self.G:
             return torch.ones_like(s), torch.ones_like(s, dtype=torch.bool)
-        top = s.topk(self.k + 1, dim=-1).values
+        top = s.detach().topk(self.k + 1, dim=-1).values          # the threshold is a constant for the gradient
         kth = top[..., self.k - 1:self.k]
         theta = 0.5 * (kth + top[..., self.k:self.k + 1])
-        return torch.sigmoid((s - theta) / self.tau), s >= kth
+        return torch.sigmoid((s - theta) / self.tau), s.detach() >= kth
 
     def gate(self, layer, h):
         """Called by BlockMLP for gated layers. Returns the (B, T, hidden) multiplier, or None for the dense path."""
@@ -269,9 +272,9 @@ class GateRouter:
             with torch.autocast(device_type=h.device.type, enabled=False):
                 gate, sel = self.soft_kwta(self.scores(i, h))
             if self.record:
-                self.last_selected[i], self.last_gate[i] = sel, gate
+                self.last_selected[i], self.last_gate[i] = sel, gate.detach()
             if self._training:
-                self._note(i, gate, sel)
+                self._note(i, gate.detach(), sel)
             if self.apply:
                 out = gate.index_select(-1, self.index[i]).to(h.dtype)
         if self._training:
@@ -383,7 +386,7 @@ class GateRouter:
 
     def write_summary(self, path):
         lines = [f"mode: gated, groups={self.groups}, layers={self.layers}, n_groups={self.G}, k={self.k}, tau={self.tau}, "
-                 f"route_smooth={self.smooth}, gamma={self.gamma}",
+                 f"route_smooth={self.smooth}, gamma={self.gamma}, gate_grad={self.gate_grad}",
                  f"steps: {self.steps}, gating from step {self.cluster_start}, clusterings: {self.n_clusterings}"]
         for i, layer in enumerate(self.layers):
             sizes = np.bincount(self.labels[i], minlength=self.G).tolist() if self.labels[i] is not None else None
@@ -423,7 +426,8 @@ def router_from_config(model, c, apply=True):
                       tau=c["gate_tau"], gamma=c["route_gamma"], smooth=c["route_smooth"], groups=c["groups"],
                       cluster_start=c["cluster_start"], cluster_every=c["cluster_every"], knn=c["knn"],
                       resolution=c["resolution"], min_size=c["min_size"], max_move=c["max_move"], ema=c["route_ema"],
-                      sample_tokens=c["assembly_sample_tokens"], seed=c["seed"], apply=apply)
+                      sample_tokens=c["assembly_sample_tokens"], seed=c["seed"], apply=apply,
+                      gate_grad=bool(c.get("gate_grad", True)))
 
 
 # ------------------------------------------------------------------------------ post-hoc groups (dense models)
@@ -487,14 +491,14 @@ def selected_sets(model, router, tokens, batch_size=32):
 
 
 def context_sensitivity(model, router, probes, pairs, max_occ=50, min_occ=2, seed=0):
-    """For each (name, context_a, context_b) and gated layer: the Jaccard distance between selected-group sets of the
+    """For each (name, context_a, context_b[, kind]) and gated layer: the Jaccard distance between selected-group sets of the
     SAME token id in context a vs context b (cross), and between two occurrences in the same context (within, the noise
     floor), each averaged over occurrence pairs, then over token ids. effect = cross - within.
     Returns {name: {layer: {"cross", "within", "effect", "n_tokens"}}}."""
     sets = {ctx: (selected_sets(model, router, toks), toks, mask) for ctx, (toks, mask) in probes.items()}
     rng = np.random.default_rng(seed)
     result = {}
-    for name, ca, cb in pairs:
+    for name, ca, cb, *_ in pairs:
         sel_a, tok_a, mask_a = sets[ca]
         sel_b, tok_b, mask_b = sets[cb]
         ids_a, ids_b = tok_a[mask_a], tok_b[mask_b]

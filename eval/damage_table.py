@@ -6,11 +6,15 @@ it, counting only targets of that category. Domain losses use random windows.
 
 Baseline: --random_sets size-matched random neuron sets per group, from the same layer. A group "damages" a category
 when its loss increase there is above BOTH an absolute floor (--min_damage, default 0.01 nats) and the 95th percentile
-of the random sets' increases for that category in the same layer. Classes:
-  lexical     damages digit_in_arith_answer AND digit_in_story
-  functional  damages digit_in_arith_answer AND number_word_in_word_problem, NOT digit_in_story
+of the random sets' increases for that category in the same layer.
+
+Primary classes, format-matched (all three categories are prose):
+  lexical     damages digit_in_prose_arith AND digit_in_story
+  functional  damages digit_in_prose_arith AND number_word_in_word_problem, NOT digit_in_story
   other       everything else
-The floor and the percentile are this script's choices, not part of the spec.
+"format" classes, reported separately: the same rules with digit_in_arith_answer (Q/A lines) in place of
+digit_in_prose_arith. Q/A lines differ from stories in format as well as function, so they support no functional claim.
+The floor and the percentile are this script's choices.
 
 Outputs (in out_dir): damage_table.csv, damage_random.csv, damage_summary.json, damage_summary.txt
 """
@@ -27,12 +31,14 @@ from gating_common import (DOMAINS, TAGS, add_args, eval_sets, group_list, load,
                            write_json)
 
 ARITH, STORY, WORDS = "tag_digit_in_arith_answer", "tag_digit_in_story", "tag_number_word_in_word_problem"
+PROSE = "tag_digit_in_prose_arith"
 
 
-def classify(damaged):
-    if damaged.get(ARITH) and damaged.get(STORY):
+def classify(damaged, digits=PROSE):
+    """digits=PROSE: the primary, format-matched classes. digits=ARITH: the "format" classes."""
+    if damaged.get(digits) and damaged.get(STORY):
         return "lexical"
-    if damaged.get(ARITH) and damaged.get(WORDS) and not damaged.get(STORY):
+    if damaged.get(digits) and damaged.get(WORDS) and not damaged.get(STORY):
         return "functional"
     return "other"
 
@@ -78,15 +84,16 @@ def main():
                              for k in names}
     for r in rows:
         damaged = {k: r[k] > thresholds[r["layer"]][k] for k in names}
-        r["class"] = classify(damaged)
+        r["class"] = classify(damaged, PROSE)
+        r["format_class"] = classify(damaged, ARITH)
         r["damaged"] = ";".join(k.split("_", 1)[1] for k in names if damaged[k])
         rr = [x for x in rand_rows if x["layer"] == r["layer"] and x["group"] == r["group"]]
-        for k in (ARITH, STORY, WORDS):
+        for k in (PROSE, ARITH, STORY, WORDS):
             if k in names:
                 r[f"excess_{k[4:]}"] = r[k] - (float(np.mean([x[k] for x in rr])) if rr else 0.0)
 
-    fields = ["layer", "group", "size", "class", "damaged", *names, *[f"excess_{k[4:]}" for k in (ARITH, STORY, WORDS)
-                                                                       if k in names]]
+    fields = ["layer", "group", "size", "class", "format_class", "damaged", *names,
+              *[f"excess_{k[4:]}" for k in (PROSE, ARITH, STORY, WORDS) if k in names]]
     with open(os.path.join(args.out_dir, "damage_table.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
@@ -97,19 +104,26 @@ def main():
         w.writerows({k: (f"{v:.5f}" if isinstance(v, float) else v) for k, v in r.items()} for r in rand_rows)
 
     counts = {c: sum(r["class"] == c for r in rows) for c in ("lexical", "functional", "other")}
+    format_counts = {c: sum(r["format_class"] == c for r in rows) for c in ("lexical", "functional", "other")}
     mean = lambda rs, k: float(np.mean([r[k] for r in rs])) if rs and k in names else float("nan")  # noqa: E731
     summary = {"source": source, "checkpoint_iter": ckpt.get("iter"), "n_groups": len(rows), "classes": counts,
+               "format_classes": format_counts,
                "random_sets": args.random_sets, "min_damage": args.min_damage,
                "unablated": base, "targets": {k: int(v[2].sum()) for k, v in sets.items()},
                "mean_damage": {k: mean(rows, k) for k in names}, "mean_random_damage": {k: mean(rand_rows, k) for k in names},
                "max_damage": {k: float(max(r[k] for r in rows)) for k in names},
                "functional_groups": [f"{r['layer']}.{r['group']}" for r in rows if r["class"] == "functional"],
                "lexical_groups": [f"{r['layer']}.{r['group']}" for r in rows if r["class"] == "lexical"],
+               "format_functional_groups": [f"{r['layer']}.{r['group']}" for r in rows if r["format_class"] == "functional"],
                "thresholds": {str(k): v for k, v in thresholds.items()}, "time_s": round(time.time() - t0)}
     write_json(os.path.join(args.out_dir, "damage_summary.json"), summary)
     lines = [f"source: {source} (checkpoint iter {ckpt.get('iter')}), {len(rows)} groups, {args.random_sets} random sets each",
-             f"classes: lexical {counts['lexical']}, functional {counts['functional']}, other {counts['other']}",
+             f"classes (format-matched: prose-arithmetic digits, word-problem number words, story digits): lexical "
+             f"{counts['lexical']}, functional {counts['functional']}, other {counts['other']}",
              f"functional: {summary['functional_groups']}", f"lexical: {summary['lexical_groups']}",
+             f"format classes (Q/A answer digits in place of prose digits): lexical {format_counts['lexical']}, "
+             f"functional {format_counts['functional']}, other {format_counts['other']}",
+             f"format functional: {summary['format_functional_groups']}",
              "mean loss increase per category (groups | random same-size sets):"]
     lines += [f"  {k:42s} {summary['mean_damage'][k]:+.4f} | {summary['mean_random_damage'][k]:+.4f}  "
               f"(max {summary['max_damage'][k]:+.4f}, {summary['targets'][k]} targets)" for k in names]
