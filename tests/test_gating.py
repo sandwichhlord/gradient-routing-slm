@@ -191,6 +191,57 @@ def test_share_score_is_each_groups_share_of_the_layer_norm():
     assert torch.allclose(r.scores(0, 7 * h), s, atol=1e-5)          # scaling every activation changes nothing
 
 
+# Ops that PyTorch documents as nondeterministic on CUDA (they accumulate with atomics, so the order of floating-point
+# additions changes between runs). A gated eval forward must not use any of them: eval/ablate.py checks that two forward
+# passes give the same logits, and on a T4 index_add_ in the group sums broke that check (gated_evolved_s0, 2026-11-10).
+NONDETERMINISTIC_ON_CUDA = {"index_add", "index_add_", "scatter_add", "scatter_add_", "scatter_reduce", "scatter_reduce_",
+                            "index_put", "index_put_", "_index_put_impl_", "put", "put_", "bincount", "histc",
+                            "kthvalue", "median", "cumsum", "cumsum_", "index_reduce", "index_reduce_"}
+
+
+def aten_ops(fn):
+    from torch.utils._python_dispatch import TorchDispatchMode
+
+    class Record(TorchDispatchMode):
+        def __init__(self):
+            super().__init__()
+            self.ops = set()
+
+        def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+            self.ops.add(func.overloadpacket.__name__)
+            return func(*args, **(kwargs or {}))
+
+    rec = Record()
+    with rec:
+        fn()
+    return rec.ops
+
+
+@pytest.mark.parametrize("score", ["relative", "share"])
+@pytest.mark.parametrize("smooth", [0.0, 0.9])
+def test_gated_forward_uses_no_op_that_is_nondeterministic_on_gpu(score, smooth):
+    model = fresh_model().eval()
+    gated(model, "evolved", score=score, smooth=smooth, labels=np.random.default_rng(0).integers(0, 8, HIDDEN))
+    x = tokens()
+    with torch.no_grad():
+        ops = aten_ops(lambda: model(x, x))
+    assert "mm" in ops or "bmm" in ops or "matmul" in ops      # the recorder sees the forward
+    assert not ops & NONDETERMINISTIC_ON_CUDA, sorted(ops & NONDETERMINISTIC_ON_CUDA)
+
+
+def test_gated_backward_uses_no_op_that_is_nondeterministic_on_gpu():
+    """The gate's own backward (score and gate expansion) is deterministic too. The token embedding's backward is an
+    index_put with accumulate in every mode, so only ops beyond the dense model's count."""
+    def run(with_gate):
+        model = fresh_model().train()
+        if with_gate:
+            gated(model, "evolved", score="share", labels=np.random.default_rng(0).integers(0, 8, HIDDEN))
+        x = tokens()
+        return aten_ops(lambda: model(x, x)[1].backward())
+    extra = run(True) - run(False)
+    assert not extra & NONDETERMINISTIC_ON_CUDA, sorted(extra & NONDETERMINISTIC_ON_CUDA)
+
+
 def test_gate_grad_does_not_change_the_forward_pass():
     a, b = fresh_model().eval(), fresh_model().eval()
     gated(a, gate_grad=True)

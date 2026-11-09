@@ -194,7 +194,8 @@ class GateRouter:
         self.tracker = CoactivationTracker(len(mlps), self.hidden, ema, sample_tokens, seed, self.device)
         self.labels = [fixed_groups(self.hidden, n_groups) if groups == "fixed" else None for _ in range(L)]
         self.index = [None] * L
-        self.sizes = [None] * L
+        self.member = [None] * L         # (hidden, G) one-hot membership: group sums are a matmul, which is
+        self.sizes = [None] * L          # deterministic on GPU (index_add_ uses atomics, so it is not)
         for i, lab in enumerate(self.labels):
             if lab is not None:
                 self._install(i, lab)
@@ -223,6 +224,7 @@ class GateRouter:
         assert labels.shape == (self.hidden,) and labels.min() >= 0 and labels.max() < self.G, "need labels 0..G-1"
         self.labels[i] = labels
         self.index[i] = torch.as_tensor(labels, dtype=torch.long, device=self.device)
+        self.member[i] = torch.nn.functional.one_hot(self.index[i], self.G).float()
         self.sizes[i] = torch.bincount(self.index[i], minlength=self.G).float().clamp_min(1.0)
 
     def set_labels(self, layer, labels):
@@ -251,15 +253,15 @@ class GateRouter:
     def scores(self, i, h):
         """(B, T, G) smoothed relative activity plus bias, in float32."""
         layer = self.layers[i]
-        idx, sizes = self.index[i], self.sizes[i]
+        member, sizes = self.member[i], self.sizes[i]
         hf = (h if self.gate_grad else h.detach()).float()
         if self.score == "share":
-            sq = torch.zeros(*hf.shape[:-1], self.G, device=h.device).index_add_(-1, idx, hf * hf)
+            sq = (hf * hf) @ member
             norms = (sq + 1e-12).sqrt()                       # eps: finite gradient for a silent group
             r = self.G * norms / norms.sum(dim=-1, keepdim=True)
         else:
-            activity = torch.zeros(*hf.shape[:-1], self.G, device=h.device).index_add_(-1, idx, hf.abs()) / sizes
-            baseline = torch.zeros(self.G, device=h.device).index_add_(0, idx, self.tracker.neuron_ema[layer].detach()) / sizes
+            activity = (hf.abs() @ member) / sizes
+            baseline = (self.tracker.neuron_ema[layer].detach() @ member) / sizes
             r = activity / baseline.clamp_min(1e-8)
         if self.smooth > 0:
             r = self._smoothing() @ r
@@ -286,7 +288,7 @@ class GateRouter:
             if self._training:
                 self._note(i, gate.detach(), sel)
             if self.apply:
-                out = gate.index_select(-1, self.index[i]).to(h.dtype)
+                out = (gate @ self.member[i].T).to(h.dtype)    # exact copy of each group's gate to its neurons
         if self._training:
             self.tracker.update(layer, h)   # after the gate: scores never see the current batch's statistics
         return out
@@ -299,7 +301,7 @@ class GateRouter:
         self.win_passes[i] += 1
         if self.domains is not None:
             d = self.domains.reshape(-1)
-            self.win_sel[:, i].index_add_(0, d, flat)
+            self.win_sel[:, i] += torch.nn.functional.one_hot(d, len(DOMAINS)).float().T @ flat
             if i == 0:
                 self.win_tokens += torch.bincount(d, minlength=len(DOMAINS)).float()
 
