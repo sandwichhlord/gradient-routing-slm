@@ -8,6 +8,7 @@
 #                 unlearning, context sensitivity); a dense run uses post-hoc groups for them.
 #   GATE_GROUPS   gated mode: fixed (default) or evolved (not GROUPS: bash reserves that name)
 #   GATE_GRAD     gated mode: 1 (default) lets gradient flow through the group scores, 0 detaches them (folder tag _gg0)
+#   GATE_SCORE    gated mode: share (default) or relative (see model/gating.py); relative adds _relative to the folder
 #   ROUTE_SMOOTH  gated mode: causal EMA of group scores along the sequence (default 0.9); also the post-hoc gating of
 #                 a dense run's evaluations. A non-default value changes the default OUT_DIR, e.g. out_gated_evolved_sm0_s0
 #   RESOLUTION, FLOOR, PLASTICITY  assembly mode settings (defaults 1.0, 0.1, rank)
@@ -43,6 +44,7 @@ if [[ -n "${PLASTICITY:-}" && "$PLASTICITY" != "rank" ]]; then TAG+="_$PLASTICIT
 if [[ -n "${LR_SCALE:-}" && "$LR_SCALE" != "1.0" ]]; then TAG+="_lr$LR_SCALE"; fi
 if [[ -n "${ROUTE_SMOOTH:-}" && "$ROUTE_SMOOTH" != "0.9" ]]; then TAG+="_sm$ROUTE_SMOOTH"; fi
 if [[ -n "${GATE_GRAD:-}" && "$GATE_GRAD" != "1" ]]; then TAG+="_gg$GATE_GRAD"; fi
+if [[ -n "${GATE_SCORE:-}" && "$GATE_SCORE" != "share" ]]; then TAG+="_$GATE_SCORE"; fi
 OUT="${OUT_DIR:-out_${NAME}${TAG}_s${SEED}}"
 
 if [[ "${SMOKE:-0}" == "1" ]]; then
@@ -83,7 +85,9 @@ if [[ -n "${PLASTICITY:-}" ]]; then TRAIN+=(--plasticity "$PLASTICITY"); fi
 if [[ -n "${LR_SCALE:-}" ]]; then TRAIN+=(--lr_scale "$LR_SCALE"); fi
 if [[ "$MODE" == "gated" ]]; then TRAIN+=(--groups "$GATE_GROUPS"); fi
 if [[ -n "${GATE_GRAD:-}" ]]; then TRAIN+=(--gate_grad "$GATE_GRAD"); fi
+if [[ -n "${GATE_SCORE:-}" ]]; then TRAIN+=(--gate_score "$GATE_SCORE"); fi
 if [[ -n "${ROUTE_SMOOTH:-}" ]]; then TRAIN+=(--route_smooth "$ROUTE_SMOOTH"); V3+=(--route_smooth "$ROUTE_SMOOTH"); fi
+if [[ -n "${GATE_SCORE:-}" ]]; then V3+=(--gate_score "$GATE_SCORE"); fi
 echo ">>> mode=$MODE seed=$SEED outputs in $OUT/"
 
 T0=$SECONDS

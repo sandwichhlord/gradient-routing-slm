@@ -28,7 +28,22 @@ These times are estimates; nothing in v3 has run on a GPU. The new data changes 
 2. `gating.csv`: selection shares near k/G = 0.375 per group; no group stuck near 0 or 1. Evolved: `gating_layers.csv` shows `moved_last` at or below 76 (5% of 1536) and sizes that change slowly.
 3. `gating_layers.csv`: the `ctx_*_effect` columns over training.
 4. `damage_summary.txt`, `failure_trace_summary.txt`, `unlearn_summary.txt`, `context_sensitivity.txt`, then `results/comparison_gated.csv` and `results/group_sizes.csv`. Functional claims use only the format-matched rows; `format_*` rows are context.
-5. Gate gradient (`--gate_grad 1`, the default): on a CPU smoke run it raised activation norms in the gated layers to about 3.6x dense and story loss by 24%. If the first gated run fails the health criterion below, rerun with `EXTRA_ENV={"GATE_GRAD": "0"}`.
+5. Health against dense, per the pre-registered criteria below. The gate default was chosen before any GPU run (next section).
+
+## Pre-GPU design decision: gate score and gate gradient (2026-11-09)
+
+**Rule, set before the comparison was run:** default to `--gate_grad 1 --gate_score share` if, in a 300-step smoke run, its per-domain val loss is within 5% of dense and its activation norms stay within 2x dense in every layer. Otherwise default to `--gate_grad 0`.
+
+**Smoke comparison:** CPU, `configs/smoke.py` (2 layers, both gated, 64 dim), synthetic data, seed 0, 300 iterations, `--groups evolved`. The dense, gate_grad 0 and gate_grad 1 + relative rows are from the earlier run of the same comparison (same data, seed and code paths); the share row was run with them unchanged.
+
+| Run | Val loss story / math / code (vs dense) | Final act norm L0 / L1 | Max ratio to dense over all evals, L0 / L1 |
+|---|---|---|---|
+| dense | 2.847 / 3.390 / 2.738 | 0.783 / 0.622 | 1 / 1 |
+| gate_grad 0 (relative) | 2.790 / 3.348 / 2.665 (-2.0%, -1.2%, -2.6%) | 0.635 / 0.491 | 1.00 / 1.00 |
+| gate_grad 1 + relative | 3.543 / 3.605 / 2.992 (+24.5%, +6.3%, +9.3%) | 2.853 / 1.179 | 3.73 / 1.90 |
+| gate_grad 1 + share | 2.958 / 3.394 / 2.700 (+3.9%, +0.1%, -1.4%) | 0.856 / 0.579 | 1.22 / 1.16 |
+
+**Decision:** `--gate_grad 1 --gate_score share` meets both conditions (worst loss +3.9%, worst norm ratio 1.22x), so it is the default for all gated runs. `GATE_SCORE=relative` and `GATE_GRAD=0` remain available. With the relative score, the gate gradient rewards raising activity against a lagging baseline, which matches the norm growth seen; the share score is unchanged when every activation is scaled. This is a smoke run on a tiny model and synthetic data, not evidence about the full-scale result. The post-hoc groups of dense runs also use the share score, so dense and gated are scored the same way.
 
 ## Pre-registered success criteria (2026-11-09, committed before any v3 result exists)
 

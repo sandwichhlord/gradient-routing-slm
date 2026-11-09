@@ -56,13 +56,15 @@ def gated(model, groups="fixed", k=3, smooth=0.9, layers=(1, 2), labels=None, **
 
 
 # ---------------------------------------------------------------------------------- forward pass
+@pytest.mark.parametrize("score", ["relative", "share"])
 @pytest.mark.parametrize("groups", ["fixed", "evolved"])
 @pytest.mark.parametrize("smooth", [0.0, 0.9])
 @pytest.mark.parametrize("training", [False, True])
-def test_k_equal_to_all_groups_is_exactly_ungated(groups, smooth, training):
+def test_k_equal_to_all_groups_is_exactly_ungated(groups, smooth, training, score):
     model, ref = fresh_model(), fresh_model()
     rng = np.random.default_rng(0)
-    gated(model, groups, k=8, smooth=smooth, labels=rng.integers(0, 8, HIDDEN) if groups == "evolved" else None)
+    gated(model, groups, k=8, smooth=smooth, labels=rng.integers(0, 8, HIDDEN) if groups == "evolved" else None,
+          score=score)
     model.train(training)
     ref.train(training)
     x = tokens()
@@ -143,9 +145,10 @@ def test_layers_not_listed_stay_dense():
     assert torch.equal(outs["gated"], outs["dense"])
 
 
-def test_no_nan_with_a_silent_group_and_dead_neurons():
+@pytest.mark.parametrize("score", ["relative", "share"])
+def test_no_nan_with_a_silent_group_and_dead_neurons(score):
     model = fresh_model().train()
-    r = gated(model, "evolved")
+    r = gated(model, "evolved", score=score)
     lab = fixed_groups(HIDDEN, 8)
     model.set_neuron_masks({1: (lab != 3).astype(np.float32)})           # group 3 of layer 1 is silent
     r.set_neuron_ema(2, torch.zeros(HIDDEN))                             # every baseline of layer 2 is zero
@@ -175,6 +178,17 @@ def test_gate_gradient_reaches_activations_only_with_gate_grad():
         assert not r.bias.requires_grad and not r.tracker.neuron_ema[2].requires_grad
         assert not r.last_gate[1].requires_grad      # the recorded copy is detached
     assert not torch.allclose(grads[True], grads[False])
+
+
+def test_share_score_is_each_groups_share_of_the_layer_norm():
+    model = fresh_model().eval()
+    r = gated(model, k=3, smooth=0.0, score="share")
+    h = torch.randn(2, 5, HIDDEN)
+    s = r.scores(0, h)
+    norms = h.view(2, 5, 8, 32).norm(dim=-1)
+    assert torch.allclose(s, 8 * norms / norms.sum(-1, keepdim=True), atol=1e-5)
+    assert torch.allclose(s.mean(-1), torch.ones(2, 5), atol=1e-5)
+    assert torch.allclose(r.scores(0, 7 * h), s, atol=1e-5)          # scaling every activation changes nothing
 
 
 def test_gate_grad_does_not_change_the_forward_pass():
