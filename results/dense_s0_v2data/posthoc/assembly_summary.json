@@ -1,0 +1,85 @@
+{
+ "source": "posthoc",
+ "checkpoint_iter": 5000,
+ "routing_mode": "dense",
+ "n_assemblies": 51,
+ "n_counted": 51,
+ "n_with_damage": 51,
+ "degenerate_layers": [],
+ "n_dead_per_layer": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "mean_S": 0.158219695513384,
+ "mean_S_ci95": [
+  0.11950389369909788,
+  0.2021060455329706
+ ],
+ "random_mean_S": 0.05294220392685249,
+ "random_mean_S_ci95": [
+  0.04205711399482091,
+  0.06444633924357941
+ ],
+ "real_minus_random_S_ci95": [
+  0.06551629710304174,
+  0.1466562349404484
+ ],
+ "random_sets": 5,
+ "damage_per_neuron": 0.0019040681270829627,
+ "random_damage_per_neuron": 0.00019933192292383392,
+ "size_weighted_S": 0.1524539133469484,
+ "damage_weighted_S": 0.15214195713936987,
+ "mean_damage": 0.18013961034662565,
+ "max_damage": 2.9474886059761047,
+ "unablated": {
+  "story": 2.2044424772262574,
+  "math": 1.4578549265861511,
+  "code": 2.4866469860076905
+ },
+ "eval_iters": 20,
+ "batch_size": 32,
+ "per_layer": [
+  {
+   "layer": 0,
+   "n_assemblies": 7,
+   "degenerate": false,
+   "mean_S": 0.2599208671694638
+  },
+  {
+   "layer": 1,
+   "n_assemblies": 9,
+   "degenerate": false,
+   "mean_S": 0.11684698512637236
+  },
+  {
+   "layer": 2,
+   "n_assemblies": 10,
+   "degenerate": false,
+   "mean_S": 0.18758359755947257
+  },
+  {
+   "layer": 3,
+   "n_assemblies": 9,
+   "degenerate": false,
+   "mean_S": 0.12400461243498478
+  },
+  {
+   "layer": 4,
+   "n_assemblies": 7,
+   "degenerate": false,
+   "mean_S": 0.08557729926061022
+  },
+  {
+   "layer": 5,
+   "n_assemblies": 9,
+   "degenerate": false,
+   "mean_S": 0.17857966139168055
+  }
+ ],
+ "posthoc_steps": 500,
+ "resolution": 1.0
+}

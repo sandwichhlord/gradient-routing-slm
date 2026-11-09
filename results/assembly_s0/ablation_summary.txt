@@ -1,0 +1,6 @@
+checkpoint iter: 5000
+eval: 20 batches x 32 x 256 tokens per domain per condition
+unablated val loss: story=2.1328, math=1.4778, code=2.5068
+mean specialization S over 48/48 blocks with positive damage: 0.0466
+most specialised blocks: 0.1 (S=0.167, worst=code), 0.7 (S=0.146, worst=code), 0.6 (S=0.115, worst=code), 0.4 (S=0.103, worst=code), 1.6 (S=0.092, worst=story)
+time: 215s

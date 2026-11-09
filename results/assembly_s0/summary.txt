@@ -1,0 +1,8 @@
+mode: assembly, plasticity=rank, floor=0.1, resolution=1.0
+steps: 5000, clusterings: 10
+mean p, whole run (p=1 while dense): 0.6089
+mean p, after the first clustering: 0.5654
+mean p per layer, whole run: L0=0.6086, L1=0.5989, L2=0.6017, L3=0.6262, L4=0.6180, L5=0.5998
+lr_scale for a matched dense run: 0.6089  (ROUTING_MODE=dense LR_SCALE=0.6089)
+assemblies per layer: [8, 7, 9, 8, 6, 10]
+degenerate layers (trained dense at the end): []

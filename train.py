@@ -8,8 +8,9 @@ Config precedence: built-in DEFAULTS < --config file (e.g. configs/baseline.py) 
 fp16 autocast + GradScaler on CUDA (no bf16, no torch.compile); fp32 on CPU.
 Writes out_dir/metrics.csv (iter, train_loss, val_story, val_math, val_code, lr, elapsed_s) and out_dir/ckpt.pt.
 --routing_mode picks the method: dense (baseline), batch (v0), token (v1), label (oracle baseline), all in
-model/routing.py, or assembly (v2, model/assemblies.py), which writes out_dir/assemblies.csv and assemblies_final.json.
-Any routed mode also writes out_dir/routing_stats.csv. --routing is the old spelling of --routing_mode batch.
+model/routing.py, assembly (v2, model/assemblies.py), which writes out_dir/assemblies.csv and assemblies_final.json,
+or gated (v3, model/gating.py; --groups fixed|evolved), which writes out_dir/gating.csv, gating_layers.csv (with the
+context-sensitivity metric at every eval) and groups_final.json. The other routed modes write out_dir/routing_stats.csv. --routing is the old spelling of --routing_mode batch.
 train_loss is always the LM loss alone. tokens_per_sec excludes eval and checkpoint time.
 """
 import argparse
@@ -28,9 +29,11 @@ from common import (DOMAINS, ROOT, PureWindowSampler, autocast_ctx, eval_domains
                     load_config_file, load_val, make_grad_scaler, open_bin, open_domains, pick_device)
 from model.model import GPT, GPTConfig  # noqa: E402
 from model.assemblies import AssemblyRouter  # noqa: E402
+from model.gating import context_sensitivity, router_from_config  # noqa: E402
+from deconf import PROBE_PAIRS, build_context_probes  # noqa: E402
 from model.routing import GradientRouter, TokenRouter  # noqa: E402
 
-ROUTING_MODES = ("dense", "batch", "token", "label", "assembly")
+ROUTING_MODES = ("dense", "batch", "token", "label", "assembly", "gated")
 
 DEFAULTS = dict(
     # io
@@ -53,6 +56,9 @@ DEFAULTS = dict(
     # assembly mode (route_ema is its correlation and activity EMA)
     cluster_start=500, cluster_every=500, knn=32, resolution=1.0, min_size=16, floor=0.1, alpha=4.0,
     plasticity="rank", consolidate=False, beta=0.5, assembly_sample_tokens=512,
+    # gated mode (v3). Shares cluster_start (gating starts, dense before), cluster_every, knn, resolution, min_size,
+    # route_gamma (balancing bias step), route_ema (activity and correlation EMA) and assembly_sample_tokens
+    groups="fixed", n_groups=8, gate_k=3, gate_tau=0.1, route_smooth=0.9, gated_layers="2,3,4,5", max_move=0.05,
     # scales the whole learning rate schedule, e.g. a dense run matched to an assembly run's mean plasticity
     lr_scale=1.0,
 )
@@ -90,6 +96,8 @@ def get_config(argv=None):
         cfg["routing_mode"] = "batch"
     if cfg["plasticity"] not in ("rank", "sigmoid"):
         raise ValueError(f"plasticity={cfg['plasticity']!r}, expected rank or sigmoid")
+    if cfg["groups"] not in ("fixed", "evolved"):
+        raise ValueError(f"groups={cfg['groups']!r}, expected fixed or evolved")
     if cfg["routing_mode"] not in ROUTING_MODES:
         raise ValueError(f"routing_mode={cfg['routing_mode']!r}, expected one of {ROUTING_MODES}")
     cfg["routing"] = cfg["routing_mode"] == "batch"
@@ -160,11 +168,17 @@ def main(argv=None):
         print(f"[train] assembly routing ON: dense until step {c['cluster_start']}, re-cluster every "
               f"{c['cluster_every']}, knn={c['knn']}, resolution={c['resolution']}, min_size={c['min_size']}, "
               f"floor={c['floor']}, plasticity={c['plasticity']}, alpha={c['alpha']}, consolidate={c['consolidate']}")
+    elif mode == "gated":
+        router = router_from_config(model, c)
+        print(f"[train] gated ON: groups={c['groups']}, layers {router.layers}, {c['n_groups']} groups, k={c['gate_k']}, "
+              f"tau={c['gate_tau']}, route_smooth={c['route_smooth']}, gamma={c['route_gamma']}, dense until step "
+              f"{c['cluster_start']}" + (f", re-cluster every {c['cluster_every']} moving at most {c['max_move']:.0%}"
+                                         if c["groups"] == "evolved" else ""))
     if mode == "label":
         sampler = PureWindowSampler(c["data_dir"], c["block_size"])
         print("[train] label mode: domain-pure windows, domain mix " + ", ".join(
             f"{d} {p:.3f}" for d, p in zip(DOMAINS, sampler.p)))
-    elif mode in ("batch", "token", "assembly"):
+    elif mode in ("batch", "token", "assembly", "gated"):
         train_domains = open_domains(c["data_dir"], len(train_data))  # logging only
 
     def next_batch():
@@ -180,8 +194,12 @@ def main(argv=None):
 
     ckpt_path = os.path.join(c["out_dir"], "ckpt.pt")
     metrics_path = os.path.join(c["out_dir"], "metrics.csv")
-    routing_path = os.path.join(c["out_dir"], "assemblies.csv" if mode == "assembly" else "routing_stats.csv")
-    assignments_path = os.path.join(c["out_dir"], "assemblies_final.json")
+    routing_path = os.path.join(c["out_dir"], {"assembly": "assemblies.csv", "gated": "gating.csv"}.get(mode, "routing_stats.csv"))
+    assignments_path = os.path.join(c["out_dir"], "groups_final.json" if mode == "gated" else "assemblies_final.json")
+    probes = None
+    if mode == "gated":
+        import tiktoken
+        probes = build_context_probes(tiktoken.get_encoding("gpt2"), n_seqs=32, seq_len=min(c["block_size"], 128))
     if mode == "assembly":
         router.log_path = routing_path
     start_iter = 0
@@ -199,8 +217,9 @@ def main(argv=None):
         with open(metrics_path, "w", newline="") as f:
             csv.writer(f).writerow(["iter", "train_loss", *[f"val_{d}" for d in DOMAINS], "lr", "elapsed_s",
                                     "tokens_per_sec", *[f"act_norm_l{i}" for i in range(c["n_layer"])]])
-        if os.path.exists(routing_path):
-            os.remove(routing_path)
+        for path in (routing_path, routing_path.replace(".csv", "_layers.csv")):
+            if os.path.exists(path):
+                os.remove(path)
 
     def save_ckpt(it):
         tmp = ckpt_path + ".tmp"
@@ -208,7 +227,7 @@ def main(argv=None):
                     "model_args": model_args, "config": c, "iter": it,
                     "router": router.state_dict() if router is not None else None}, tmp)
         os.replace(tmp, ckpt_path)  # atomic: a crash mid-save never corrupts the last good checkpoint
-        if mode == "assembly":
+        if mode in ("assembly", "gated"):
             router.write_assignments(assignments_path)
             router.write_summary(os.path.join(c["out_dir"], "summary.txt"))
         print(f"[train] saved checkpoint @ iter {it} -> {ckpt_path}", flush=True)
@@ -224,7 +243,15 @@ def main(argv=None):
                                     "" if tokens_per_sec is None else f"{tokens_per_sec:.0f}",
                                     *[f"{a:.3f}" for a in act_norms]])
         print(f"[eval] iter {it}: train {train_loss:.4f} | " + " | ".join(f"{d} {losses[d]:.4f}" for d in DOMAINS), flush=True)
-        if router is not None and router.steps > 0:
+        if mode == "gated" and router.steps > 0:
+            extra = {}
+            if all(router.active(i) for i in range(len(router.layers))):
+                ctx = context_sensitivity(model, router, probes, PROBE_PAIRS, max_occ=30)
+                extra = {layer: {f"ctx_{name}_{k}": f"{v[layer][k]:.4f}" for name, v in ctx.items()
+                                 for k in ("cross", "within", "effect")} for layer in router.layers}
+            router.log(it, routing_path, extra)
+            print(f"[route] iter {it}: {router.summary()}", flush=True)
+        elif router is not None and router.steps > 0:
             router.log(it, routing_path)
             print(f"[route] iter {it}: {router.summary()}", flush=True)
 
@@ -247,7 +274,7 @@ def main(argv=None):
             g["lr"] = lr
 
         for _ in range(c["grad_accum"]):
-            if mode in ("token", "label", "assembly"):
+            if mode in ("token", "label", "assembly", "gated"):
                 router.set_batch(dom)
             with ctx:
                 _, loss = model(x, y)
@@ -262,7 +289,7 @@ def main(argv=None):
         if c["grad_clip"] > 0:
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), c["grad_clip"])
-        if mode in ("token", "label", "assembly"):
+        if mode in ("token", "label", "assembly", "gated"):
             router.step(optimizer, scaler)
         else:
             scaler.step(optimizer)

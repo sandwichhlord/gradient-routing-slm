@@ -1,0 +1,19 @@
+source: posthoc (checkpoint iter 5000), k=3 of 8 groups, layers [2, 3, 4, 5]
+Jaccard distance of selected groups, same token: arithmetic vs story (cross), two occurrences in one context (within); effect = cross - within
+  smooth 0.0  digits        L2: cross 0.680 within 0.510 effect +0.170 (99 token ids)
+  smooth 0.0  digits        L3: cross 0.717 within 0.411 effect +0.306 (99 token ids)
+  smooth 0.0  digits        L4: cross 0.624 within 0.422 effect +0.202 (99 token ids)
+  smooth 0.0  digits        L5: cross 0.666 within 0.486 effect +0.180 (99 token ids)
+  smooth 0.0  number_words  L2: cross 0.582 within 0.501 effect +0.081 (11 token ids)
+  smooth 0.0  number_words  L3: cross 0.309 within 0.272 effect +0.036 (11 token ids)
+  smooth 0.0  number_words  L4: cross 0.290 within 0.285 effect +0.006 (11 token ids)
+  smooth 0.0  number_words  L5: cross 0.429 within 0.393 effect +0.036 (11 token ids)
+  smooth 0.9  digits        L2: cross 0.643 within 0.363 effect +0.280 (99 token ids)
+  smooth 0.9  digits        L3: cross 0.928 within 0.341 effect +0.587 (99 token ids)
+  smooth 0.9  digits        L4: cross 0.916 within 0.298 effect +0.618 (99 token ids)
+  smooth 0.9  digits        L5: cross 0.922 within 0.321 effect +0.600 (99 token ids)
+  smooth 0.9  number_words  L2: cross 0.615 within 0.522 effect +0.094 (11 token ids)
+  smooth 0.9  number_words  L3: cross 0.186 within 0.179 effect +0.007 (11 token ids)
+  smooth 0.9  number_words  L4: cross 0.367 within 0.356 effect +0.012 (11 token ids)
+  smooth 0.9  number_words  L5: cross 0.440 within 0.428 effect +0.012 (11 token ids)
+time: 337s

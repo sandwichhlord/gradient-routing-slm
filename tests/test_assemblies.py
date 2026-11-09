@@ -328,7 +328,8 @@ def test_bootstrap_ci_contains_the_mean_and_ignores_nan():
 def smoke_data(tmp_path_factory):
     d = tmp_path_factory.mktemp("data")
     subprocess.run([sys.executable, os.path.join(ROOT, "data", "prepare.py"), "--synthetic",
-                    "--synthetic_tokens", "50000", "--out_dir", str(d)], check=True, capture_output=True)
+                    "--synthetic_tokens", "50000", "--deconf_frac", "0", "--holdout_arith", "0", "--out_dir", str(d)],
+                   check=True, capture_output=True)
     return d
 
 

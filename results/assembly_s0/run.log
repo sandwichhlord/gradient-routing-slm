@@ -1,0 +1,488 @@
+>>> mode=assembly seed=0 outputs in out_assembly_s0/
+
+=================== [1/6] prepare data  (t=0s) ===================
+[prepare] collecting story: 20,500,000 tokens
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+  [story] 2.0M / 20.5M tokens (18s)
+  [story] 4.1M / 20.5M tokens (20s)
+  [story] 6.1M / 20.5M tokens (21s)
+  [story] 8.1M / 20.5M tokens (23s)
+  [story] 10.1M / 20.5M tokens (24s)
+  [story] 12.2M / 20.5M tokens (26s)
+  [story] 14.2M / 20.5M tokens (27s)
+  [story] 16.2M / 20.5M tokens (28s)
+  [story] 18.3M / 20.5M tokens (29s)
+  [story] 20.3M / 20.5M tokens (31s)
+[prepare] story: 91200 train docs, 2240 val docs (31s)
+[prepare] collecting math: 10,500,000 tokens
+  [math] 2.0M / 10.5M tokens (2s)
+  [math] 4.0M / 10.5M tokens (4s)
+  [math] 6.0M / 10.5M tokens (5s)
+  [math] 8.0M / 10.5M tokens (7s)
+  [math] 10.0M / 10.5M tokens (9s)
+[prepare] math: 46085 train docs, 2299 val docs (9s)
+[prepare] collecting code: 10,500,000 tokens
+Repo card metadata block was not found. Setting CardData to empty.
+  [code] 2.2M / 10.5M tokens (3s)
+  [code] 4.5M / 10.5M tokens (5s)
+  [code] 6.7M / 10.5M tokens (6s)
+  [code] 8.8M / 10.5M tokens (8s)
+  [code] 11.1M / 10.5M tokens (9s)
+[prepare] code: 4902 train docs, 218 val docs (9s)
+[prepare] done (real): {"mode": "real", "vocab_size": 50257, "eot": 50256, "domains": ["story", "math", "code"], "train_tokens": 40623542, "train_tokens_per_domain": {"story": 20005009, "math": 10030871, "code": 10587662}, "val_story_tokens": 500021, "val_math_tokens": 500101, "val_code_tokens": 500263}
+
+=================== [2/6] train  (t=55s) ===================
+[train] GPU: Tesla T4
+[train] train tokens: 40,623,542 | val_story: 500,021 | val_math: 500,101 | val_code: 500,263
+[train] assembly routing ON: dense until step 500, re-cluster every 500, knn=32, resolution=1.0, min_size=16, floor=0.1, plasticity=rank, alpha=4.0, consolidate=False
+[train] device=cuda amp=fp16 params=29.94M (non-embedding 10.62M)
+[eval] iter 0: train 10.8140 | story 10.9034 | math 10.9364 | code 10.6366
+[train] iter 50/5000 loss 7.1040 lr 1.49e-04 423ms/it | elapsed 0m21s | ETA 34m52s
+[train] iter 100/5000 loss 4.4140 lr 2.99e-04 181ms/it | elapsed 0m30s | ETA 24m40s
+[train] iter 150/5000 loss 3.8180 lr 4.48e-04 182ms/it | elapsed 0m39s | ETA 21m11s
+[train] iter 200/5000 loss 3.8458 lr 5.97e-04 183ms/it | elapsed 0m48s | ETA 19m23s
+[train] iter 250/5000 loss 3.8156 lr 6.00e-04 185ms/it | elapsed 0m57s | ETA 18m17s
+[eval] iter 250: train 5.2509 | story 3.9825 | math 2.0898 | code 4.1428
+[route] iter 250: assembly: dense until step 500 (step 250)
+[train] iter 300/5000 loss 3.4079 lr 5.99e-04 400ms/it | elapsed 1m17s | ETA 20m17s
+[train] iter 350/5000 loss 3.3815 lr 5.99e-04 194ms/it | elapsed 1m27s | ETA 19m21s
+[train] iter 400/5000 loss 3.5369 lr 5.98e-04 198ms/it | elapsed 1m37s | ETA 18m39s
+[train] iter 450/5000 loss 3.2323 lr 5.96e-04 203ms/it | elapsed 1m47s | ETA 18m06s
+[train] iter 500/5000 loss 3.2733 lr 5.95e-04 271ms/it | elapsed 2m00s | ETA 18m08s
+[eval] iter 500: train 3.2950 | story 3.3833 | math 1.8689 | code 3.7086
+[route] iter 500: assembly: clusterings 1 | assemblies per layer [8, 8, 9, 9, 9, 11] | stability n/a | degenerate layers []
+[train] iter 550/5000 loss 2.9274 lr 5.93e-04 467ms/it | elapsed 2m24s | ETA 19m27s
+[train] iter 600/5000 loss 2.8259 lr 5.91e-04 228ms/it | elapsed 2m35s | ETA 19m02s
+[train] iter 650/5000 loss 3.0609 lr 5.88e-04 226ms/it | elapsed 2m47s | ETA 18m37s
+[train] iter 700/5000 loss 3.0174 lr 5.86e-04 224ms/it | elapsed 2m58s | ETA 18m14s
+[train] iter 750/5000 loss 2.7775 lr 5.83e-04 224ms/it | elapsed 3m09s | ETA 17m53s
+[eval] iter 750: train 2.9987 | story 3.0977 | math 1.8008 | code 3.4991
+[route] iter 750: assembly: clusterings 1 | assemblies per layer [8, 8, 9, 9, 9, 11] | stability n/a | degenerate layers []
+[train] iter 800/5000 loss 3.0540 lr 5.80e-04 452ms/it | elapsed 3m32s | ETA 18m33s
+[train] iter 850/5000 loss 2.9307 lr 5.76e-04 229ms/it | elapsed 3m43s | ETA 18m10s
+[train] iter 900/5000 loss 2.7692 lr 5.72e-04 228ms/it | elapsed 3m54s | ETA 17m49s
+[train] iter 950/5000 loss 2.6020 lr 5.68e-04 228ms/it | elapsed 4m06s | ETA 17m29s
+[train] iter 1000/5000 loss 2.8497 lr 5.64e-04 276ms/it | elapsed 4m20s | ETA 17m20s
+[eval] iter 1000: train 2.8199 | story 2.9188 | math 1.7464 | code 3.3261
+[route] iter 1000: assembly: clusterings 2 | assemblies per layer [7, 8, 10, 8, 8, 10] | stability ['0.24', '0.09', '0.15', '0.23', '0.28', '0.29'] | degenerate layers []
+[train] saved checkpoint @ iter 1000 -> out_assembly_s0/ckpt.pt
+[train] iter 1050/5000 loss 2.6609 lr 5.59e-04 461ms/it | elapsed 4m43s | ETA 17m44s
+[train] iter 1100/5000 loss 2.5872 lr 5.55e-04 228ms/it | elapsed 4m54s | ETA 17m24s
+[train] iter 1150/5000 loss 2.5898 lr 5.50e-04 229ms/it | elapsed 5m05s | ETA 17m04s
+[train] iter 1200/5000 loss 2.4979 lr 5.44e-04 228ms/it | elapsed 5m17s | ETA 16m44s
+[train] iter 1250/5000 loss 2.6396 lr 5.39e-04 228ms/it | elapsed 5m28s | ETA 16m26s
+[eval] iter 1250: train 2.6850 | story 2.7747 | math 1.7077 | code 3.2212
+[route] iter 1250: assembly: clusterings 2 | assemblies per layer [7, 8, 10, 8, 8, 10] | stability ['0.24', '0.09', '0.15', '0.23', '0.28', '0.29'] | degenerate layers []
+[train] iter 1300/5000 loss 2.5528 lr 5.33e-04 451ms/it | elapsed 5m51s | ETA 16m39s
+[train] iter 1350/5000 loss 2.6749 lr 5.27e-04 226ms/it | elapsed 6m02s | ETA 16m20s
+[train] iter 1400/5000 loss 2.6460 lr 5.21e-04 226ms/it | elapsed 6m13s | ETA 16m01s
+[train] iter 1450/5000 loss 2.6664 lr 5.15e-04 226ms/it | elapsed 6m25s | ETA 15m43s
+[train] iter 1500/5000 loss 2.3261 lr 5.08e-04 275ms/it | elapsed 6m38s | ETA 15m30s
+[eval] iter 1500: train 2.5902 | story 2.6733 | math 1.6732 | code 3.1371
+[route] iter 1500: assembly: clusterings 3 | assemblies per layer [9, 7, 9, 8, 7, 10] | stability ['0.24', '0.26', '0.23', '0.38', '0.40', '0.40'] | degenerate layers []
+[train] iter 1550/5000 loss 2.4528 lr 5.01e-04 452ms/it | elapsed 7m01s | ETA 15m38s
+[train] iter 1600/5000 loss 2.5767 lr 4.95e-04 229ms/it | elapsed 7m12s | ETA 15m20s
+[train] iter 1650/5000 loss 2.3793 lr 4.87e-04 229ms/it | elapsed 7m24s | ETA 15m02s
+[train] iter 1700/5000 loss 2.3775 lr 4.80e-04 228ms/it | elapsed 7m35s | ETA 14m44s
+[train] iter 1750/5000 loss 2.3385 lr 4.73e-04 228ms/it | elapsed 7m47s | ETA 14m27s
+[eval] iter 1750: train 2.5049 | story 2.5868 | math 1.6481 | code 3.0552
+[route] iter 1750: assembly: clusterings 3 | assemblies per layer [9, 7, 9, 8, 7, 10] | stability ['0.24', '0.26', '0.23', '0.38', '0.40', '0.40'] | degenerate layers []
+[train] iter 1800/5000 loss 2.3595 lr 4.65e-04 453ms/it | elapsed 8m09s | ETA 14m30s
+[train] iter 1850/5000 loss 2.5992 lr 4.57e-04 227ms/it | elapsed 8m21s | ETA 14m13s
+[train] iter 1900/5000 loss 2.4041 lr 4.50e-04 226ms/it | elapsed 8m32s | ETA 13m56s
+[train] iter 1950/5000 loss 2.3539 lr 4.42e-04 227ms/it | elapsed 8m43s | ETA 13m39s
+[train] iter 2000/5000 loss 2.5425 lr 4.33e-04 272ms/it | elapsed 8m57s | ETA 13m26s
+[eval] iter 2000: train 2.4619 | story 2.5156 | math 1.6234 | code 2.9796
+[route] iter 2000: assembly: clusterings 4 | assemblies per layer [7, 7, 10, 8, 6, 10] | stability ['0.24', '0.28', '0.33', '0.38', '0.42', '0.42'] | degenerate layers []
+[train] saved checkpoint @ iter 2000 -> out_assembly_s0/ckpt.pt
+[train] iter 2050/5000 loss 2.6031 lr 4.25e-04 464ms/it | elapsed 9m20s | ETA 13m26s
+[train] iter 2100/5000 loss 2.1578 lr 4.17e-04 229ms/it | elapsed 9m32s | ETA 13m10s
+[train] iter 2150/5000 loss 2.3777 lr 4.09e-04 230ms/it | elapsed 9m43s | ETA 12m53s
+[train] iter 2200/5000 loss 2.3528 lr 4.00e-04 229ms/it | elapsed 9m55s | ETA 12m37s
+[train] iter 2250/5000 loss 2.4186 lr 3.91e-04 229ms/it | elapsed 10m06s | ETA 12m21s
+[eval] iter 2250: train 2.3963 | story 2.4575 | math 1.6051 | code 2.9048
+[route] iter 2250: assembly: clusterings 4 | assemblies per layer [7, 7, 10, 8, 6, 10] | stability ['0.24', '0.28', '0.33', '0.38', '0.42', '0.42'] | degenerate layers []
+[train] iter 2300/5000 loss 2.4780 lr 3.83e-04 454ms/it | elapsed 10m29s | ETA 12m18s
+[train] iter 2350/5000 loss 2.4373 lr 3.74e-04 227ms/it | elapsed 10m40s | ETA 12m02s
+[train] iter 2400/5000 loss 2.3409 lr 3.65e-04 227ms/it | elapsed 10m51s | ETA 11m46s
+[train] iter 2450/5000 loss 2.2471 lr 3.57e-04 228ms/it | elapsed 11m03s | ETA 11m30s
+[train] iter 2500/5000 loss 2.2100 lr 3.48e-04 274ms/it | elapsed 11m17s | ETA 11m17s
+[eval] iter 2500: train 2.3336 | story 2.4013 | math 1.5846 | code 2.8552
+[route] iter 2500: assembly: clusterings 5 | assemblies per layer [8, 6, 9, 8, 7, 10] | stability ['0.30', '0.38', '0.42', '0.61', '0.57', '0.47'] | degenerate layers []
+[train] iter 2550/5000 loss 2.3538 lr 3.39e-04 455ms/it | elapsed 11m39s | ETA 11m12s
+[train] iter 2600/5000 loss 2.2580 lr 3.30e-04 229ms/it | elapsed 11m51s | ETA 10m56s
+[train] iter 2650/5000 loss 2.3317 lr 3.21e-04 229ms/it | elapsed 12m02s | ETA 10m40s
+[train] iter 2700/5000 loss 2.3895 lr 3.13e-04 229ms/it | elapsed 12m14s | ETA 10m25s
+[train] iter 2750/5000 loss 2.2208 lr 3.04e-04 228ms/it | elapsed 12m25s | ETA 10m09s
+[eval] iter 2750: train 2.2993 | story 2.3582 | math 1.5625 | code 2.7967
+[route] iter 2750: assembly: clusterings 5 | assemblies per layer [8, 6, 9, 8, 7, 10] | stability ['0.30', '0.38', '0.42', '0.61', '0.57', '0.47'] | degenerate layers []
+[train] iter 2800/5000 loss 2.4948 lr 2.95e-04 453ms/it | elapsed 12m48s | ETA 10m03s
+[train] iter 2850/5000 loss 2.1003 lr 2.86e-04 226ms/it | elapsed 12m59s | ETA 9m48s
+[train] iter 2900/5000 loss 2.2052 lr 2.77e-04 226ms/it | elapsed 13m10s | ETA 9m32s
+[train] iter 2950/5000 loss 2.1806 lr 2.69e-04 228ms/it | elapsed 13m22s | ETA 9m17s
+[train] iter 3000/5000 loss 2.0880 lr 2.60e-04 273ms/it | elapsed 13m35s | ETA 9m03s
+[eval] iter 3000: train 2.2468 | story 2.3106 | math 1.5453 | code 2.7419
+[route] iter 3000: assembly: clusterings 6 | assemblies per layer [7, 7, 11, 8, 7, 11] | stability ['0.31', '0.44', '0.50', '0.67', '0.67', '0.58'] | degenerate layers []
+[train] saved checkpoint @ iter 3000 -> out_assembly_s0/ckpt.pt
+[train] iter 3050/5000 loss 2.2249 lr 2.52e-04 468ms/it | elapsed 13m59s | ETA 8m56s
+[train] iter 3100/5000 loss 2.3246 lr 2.43e-04 230ms/it | elapsed 14m10s | ETA 8m41s
+[train] iter 3150/5000 loss 2.1008 lr 2.35e-04 229ms/it | elapsed 14m22s | ETA 8m26s
+[train] iter 3200/5000 loss 2.1956 lr 2.27e-04 227ms/it | elapsed 14m33s | ETA 8m11s
+[train] iter 3250/5000 loss 1.9719 lr 2.19e-04 227ms/it | elapsed 14m44s | ETA 7m56s
+[eval] iter 3250: train 2.2250 | story 2.2766 | math 1.5321 | code 2.6992
+[route] iter 3250: assembly: clusterings 6 | assemblies per layer [7, 7, 11, 8, 7, 11] | stability ['0.31', '0.44', '0.50', '0.67', '0.67', '0.58'] | degenerate layers []
+[train] iter 3300/5000 loss 2.1462 lr 2.11e-04 455ms/it | elapsed 15m07s | ETA 7m47s
+[train] iter 3350/5000 loss 2.4270 lr 2.03e-04 229ms/it | elapsed 15m19s | ETA 7m32s
+[train] iter 3400/5000 loss 2.0781 lr 1.95e-04 228ms/it | elapsed 15m30s | ETA 7m17s
+[train] iter 3450/5000 loss 2.0856 lr 1.88e-04 228ms/it | elapsed 15m41s | ETA 7m03s
+[train] iter 3500/5000 loss 2.0603 lr 1.80e-04 273ms/it | elapsed 15m55s | ETA 6m49s
+[eval] iter 3500: train 2.1818 | story 2.2411 | math 1.5197 | code 2.6525
+[route] iter 3500: assembly: clusterings 7 | assemblies per layer [8, 8, 9, 8, 6, 11] | stability ['0.25', '0.40', '0.57', '0.71', '0.64', '0.71'] | degenerate layers []
+[train] iter 3550/5000 loss 2.1912 lr 1.73e-04 454ms/it | elapsed 16m18s | ETA 6m39s
+[train] iter 3600/5000 loss 2.1292 lr 1.66e-04 229ms/it | elapsed 16m29s | ETA 6m24s
+[train] iter 3650/5000 loss 2.1587 lr 1.59e-04 230ms/it | elapsed 16m41s | ETA 6m10s
+[train] iter 3700/5000 loss 2.1990 lr 1.52e-04 229ms/it | elapsed 16m52s | ETA 5m55s
+[train] iter 3750/5000 loss 2.3233 lr 1.46e-04 228ms/it | elapsed 17m04s | ETA 5m41s
+[eval] iter 3750: train 2.1465 | story 2.2138 | math 1.5096 | code 2.6154
+[route] iter 3750: assembly: clusterings 7 | assemblies per layer [8, 8, 9, 8, 6, 11] | stability ['0.25', '0.40', '0.57', '0.71', '0.64', '0.71'] | degenerate layers []
+[train] iter 3800/5000 loss 2.1007 lr 1.39e-04 453ms/it | elapsed 17m26s | ETA 5m30s
+[train] iter 3850/5000 loss 2.0295 lr 1.33e-04 227ms/it | elapsed 17m38s | ETA 5m16s
+[train] iter 3900/5000 loss 1.9095 lr 1.27e-04 227ms/it | elapsed 17m49s | ETA 5m01s
+[train] iter 3950/5000 loss 2.1484 lr 1.21e-04 227ms/it | elapsed 18m00s | ETA 4m47s
+[train] iter 4000/5000 loss 2.2628 lr 1.16e-04 273ms/it | elapsed 18m14s | ETA 4m33s
+[eval] iter 4000: train 2.1403 | story 2.1895 | math 1.5019 | code 2.5793
+[route] iter 4000: assembly: clusterings 8 | assemblies per layer [7, 7, 11, 8, 6, 11] | stability ['0.39', '0.56', '0.65', '0.75', '0.61', '0.75'] | degenerate layers []
+[train] saved checkpoint @ iter 4000 -> out_assembly_s0/ckpt.pt
+[train] iter 4050/5000 loss 1.9801 lr 1.11e-04 464ms/it | elapsed 18m37s | ETA 4m22s
+[train] iter 4100/5000 loss 2.2103 lr 1.06e-04 230ms/it | elapsed 18m49s | ETA 4m07s
+[train] iter 4150/5000 loss 2.2174 lr 1.01e-04 230ms/it | elapsed 19m00s | ETA 3m53s
+[train] iter 4200/5000 loss 1.9905 lr 9.63e-05 230ms/it | elapsed 19m12s | ETA 3m39s
+[train] iter 4250/5000 loss 2.1055 lr 9.20e-05 229ms/it | elapsed 19m23s | ETA 3m25s
+[eval] iter 4250: train 2.1001 | story 2.1718 | math 1.4930 | code 2.5541
+[route] iter 4250: assembly: clusterings 8 | assemblies per layer [7, 7, 11, 8, 6, 11] | stability ['0.39', '0.56', '0.65', '0.75', '0.61', '0.75'] | degenerate layers []
+[train] iter 4300/5000 loss 2.2437 lr 8.79e-05 454ms/it | elapsed 19m46s | ETA 3m13s
+[train] iter 4350/5000 loss 2.2639 lr 8.41e-05 227ms/it | elapsed 19m57s | ETA 2m58s
+[train] iter 4400/5000 loss 2.0336 lr 8.06e-05 228ms/it | elapsed 20m09s | ETA 2m44s
+[train] iter 4450/5000 loss 2.1211 lr 7.74e-05 229ms/it | elapsed 20m20s | ETA 2m30s
+[train] iter 4500/5000 loss 2.1508 lr 7.44e-05 276ms/it | elapsed 20m34s | ETA 2m17s
+[eval] iter 4500: train 2.0862 | story 2.1587 | math 1.4865 | code 2.5343
+[route] iter 4500: assembly: clusterings 9 | assemblies per layer [7, 7, 10, 8, 7, 9] | stability ['0.53', '0.69', '0.75', '0.80', '0.75', '0.67'] | degenerate layers []
+[train] iter 4550/5000 loss 2.1847 lr 7.17e-05 455ms/it | elapsed 20m57s | ETA 2m04s
+[train] iter 4600/5000 loss 1.9759 lr 6.92e-05 230ms/it | elapsed 21m08s | ETA 1m50s
+[train] iter 4650/5000 loss 2.1039 lr 6.71e-05 230ms/it | elapsed 21m20s | ETA 1m36s
+[train] iter 4700/5000 loss 2.0542 lr 6.52e-05 230ms/it | elapsed 21m31s | ETA 1m22s
+[train] iter 4750/5000 loss 2.0178 lr 6.36e-05 230ms/it | elapsed 21m43s | ETA 1m08s
+[eval] iter 4750: train 2.0788 | story 2.1477 | math 1.4828 | code 2.5183
+[route] iter 4750: assembly: clusterings 9 | assemblies per layer [7, 7, 10, 8, 7, 9] | stability ['0.53', '0.69', '0.75', '0.80', '0.75', '0.67'] | degenerate layers []
+[train] iter 4800/5000 loss 1.9243 lr 6.23e-05 454ms/it | elapsed 22m05s | ETA 0m55s
+[train] iter 4850/5000 loss 1.9425 lr 6.13e-05 228ms/it | elapsed 22m17s | ETA 0m41s
+[train] iter 4900/5000 loss 2.0536 lr 6.06e-05 228ms/it | elapsed 22m28s | ETA 0m27s
+[train] iter 4950/5000 loss 2.0582 lr 6.02e-05 229ms/it | elapsed 22m39s | ETA 0m13s
+[train] iter 5000/5000 loss 2.0991 lr 6.00e-05 274ms/it | elapsed 22m53s | ETA 0m00s
+[eval] iter 5000: train 2.0589 | story 2.1388 | math 1.4790 | code 2.5084
+[route] iter 5000: assembly: clusterings 10 | assemblies per layer [8, 7, 9, 8, 6, 10] | stability ['0.43', '0.64', '0.70', '0.82', '0.67', '0.76'] | degenerate layers []
+[train] saved checkpoint @ iter 5000 -> out_assembly_s0/ckpt.pt
+[route] final: assembly: clusterings 10 | assemblies per layer [8, 7, 9, 8, 6, 10] | stability ['0.43', '0.64', '0.70', '0.82', '0.67', '0.76'] | degenerate layers []
+[train] finished in 23m05s
+
+=================== [3/6] sample  (t=1451s) ===================
+# samples from checkpoint @ iter 5000 (temperature=0.8, top_k=200, max_new_tokens=120)
+
+=== prompt: 'Once upon a time' | sample 1 ===
+Once upon a time there was an old man. He was very kind and so kind to each other. One day, he noticed a bright, dirty spider flying under the bed. He hopped over to investigate and found a shiny bulb. The spider closed its eyes and grabbed the bulb inside.
+
+The old man was very happy and cheered! He could barely believe his eyes. He knew it was the perfect plant he needed to look at it. But with a lot of curiosity, he slowly closed his eyes.
+
+Suddenly, he felt something strange. It was an unknown plant! He had never seen anything in
+
+=== prompt: 'Once upon a time' | sample 2 ===
+Once upon a time there was a little boy who was very hungry. He had to wait for the day to eat lunch.
+
+The boy hopped out of the door and said, "I will help you. Do you need me to eat?"
+
+The little boy nodded and the little boy started to eat Mom. He said, "Okay, Mom. I will go to the kitchen."
+
+They ran to the kitchen and got some berries. They talked, danced, and laughed and talked. They were very happy.
+
+After lunch, they sat down a chair and enjoyed their dinner. The man
+
+=== prompt: 'Once upon a time' | sample 3 ===
+Once upon a time there lived a little girl named Lily. She was very curious and loved to discover things. 
+
+One morning, she wanted to know what she was going to do. She went outside and saw a big, colourful flower. She asked her mommy to look at it and her mommy said, "Honey, the flower is so big and soft."
+
+Lily was very happy with the flower that she could carry. She showed it to her mommy and daddy. They said, "Wow, that's so pretty!" So they went to her house together and found many things
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 1 ===
+Q: 37 + 48 = A: 88
+Q: 667 - 1 = A: 656
+Q: 691 - 33 = A: 636
+Q: 9 + 845 = A: 845
+Q: 1 + 851 = A: 856
+Q: 642 - 1 = A: 649
+Q: 1 + 0 = A: 1
+Q: 281 + 0 = A: 256
+Q: 15 x 58 = A: 830
+Q: 0 - 9 = A: -9
+Q: 7 x 731 = A: 4982
+Q: 1
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 2 ===
+Q: 37 + 48 = A: 95
+Q: 32 + 6 = A: 38
+Q: 53 - 22 = A: 34
+Q: 7 x 0 = A: 0
+Q: 73 + 1 = A: 76
+Q: 6 x 6 = A: 36
+
+=== prompt: 'Q: 37 + 48 = A:' | sample 3 ===
+Q: 37 + 48 = A: 78
+Q: 26 - 5 = A: 21
+Q: 521 x 6 = A: 3776
+Q: 4 + 9 = A: 13
+Q: 8 - 4 = A: 4
+Q: 1 + 7 = A: 8
+Q: 42 + 3 = A: 46
+Q: 939 + 769 = A: 1606
+Q: 0 x 784 = A: 0
+Q: 7 + 3 = A: 10
+Q: 5 x 2 = A: 10
+Q: 9 x 66 = A: 646
+Q
+
+=== prompt: 'def add(a, b):' | sample 1 ===
+def add(a, b):
+        :return :r: the '''
+        :return:
+        :r: The current data containing the list of a instance of the form.
+        :r: The defaultDict, or the ``check_app_cmd()
+
+        :return: a list of options required
+        :return: The list of group of options are
+        :return
+
+=== prompt: 'def add(a, b):' | sample 2 ===
+def add(a, b):
+        o = b.readline(".join(c, b.","([(r.split(),().[(r)), d.','(r), '[0].id))[0])
+        o.write('# %s: %s, %s.split(r))
+       o = b
+       o.write('# %s: %s, %s.split())
+       o = b.
+
+=== prompt: 'def add(a, b):' | sample 3 ===
+def add(a, b):
+    """
+    Number of the : A: A list of type for the c. One entry of the dtype set).
+    """
+    def GetFrom(a, b, b, c, b):
+        """
+        This is a string from the self.
+        :param b: The string will be passed and
+        """
+        # If the type is None
+
+[sample] wrote out_assembly_s0/samples.txt
+
+=================== [4/6] plots  (t=1456s) ===================
+[plots] wrote out_assembly_s0/loss_curves.png
+
+=================== [5/6] ablate  (t=1459s) ===================
+[ablate] mask check passed: ablating L0.B0 changes logits by up to 2.7578; all-ones mask and clear_ablation() reproduce the dense model
+[ablate] unablated: story 2.1328 | math 1.4778 | code 2.5068
+[ablate] 1/48 L0.B0: story +0.0310 math +0.0167 code +0.0421 | S=0.058 | ETA 410s
+[ablate] 2/48 L0.B1: story +0.0605 math +0.0341 code +0.1529 | S=0.167 | ETA 301s
+[ablate] 3/48 L0.B2: story +0.0439 math +0.0354 code +0.0918 | S=0.082 | ETA 263s
+[ablate] 4/48 L0.B3: story +0.0479 math +0.0380 code +0.0736 | S=0.035 | ETA 243s
+[ablate] 5/48 L0.B4: story +0.0383 math +0.0130 code +0.0480 | S=0.103 | ETA 230s
+[ablate] 6/48 L0.B5: story +0.0448 math +0.0387 code +0.0641 | S=0.021 | ETA 220s
+[ablate] 7/48 L0.B6: story +0.0354 math +0.0143 code +0.0564 | S=0.115 | ETA 212s
+[ablate] 8/48 L0.B7: story +0.0684 math +0.0383 code +0.1575 | S=0.146 | ETA 204s
+[ablate] 9/48 L1.B0: story +0.0088 math +0.0071 code +0.0154 | S=0.051 | ETA 197s
+[ablate] 10/48 L1.B1: story +0.0042 math +0.0021 code +0.0046 | S=0.048 | ETA 189s
+[ablate] 11/48 L1.B2: story +0.0044 math +0.0017 code +0.0050 | S=0.078 | ETA 182s
+[ablate] 12/48 L1.B3: story +0.0038 math +0.0023 code +0.0047 | S=0.037 | ETA 175s
+[ablate] 13/48 L1.B4: story +0.0056 math +0.0038 code +0.0058 | S=0.015 | ETA 169s
+[ablate] 14/48 L1.B5: story +0.0057 math +0.0023 code +0.0043 | S=0.055 | ETA 163s
+[ablate] 15/48 L1.B6: story +0.0078 math +0.0024 code +0.0046 | S=0.092 | ETA 157s
+[ablate] 16/48 L1.B7: story +0.0064 math +0.0037 code +0.0045 | S=0.024 | ETA 151s
+[ablate] 17/48 L2.B0: story +0.0089 math +0.0041 code +0.0045 | S=0.059 | ETA 145s
+[ablate] 18/48 L2.B1: story +0.0075 math +0.0055 code +0.0045 | S=0.021 | ETA 140s
+[ablate] 19/48 L2.B2: story +0.0072 math +0.0065 code +0.0057 | S=0.004 | ETA 135s
+[ablate] 20/48 L2.B3: story +0.0064 math +0.0049 code +0.0072 | S=0.011 | ETA 130s
+[ablate] 21/48 L2.B4: story +0.0076 math +0.0047 code +0.0056 | S=0.019 | ETA 124s
+[ablate] 22/48 L2.B5: story +0.0079 math +0.0064 code +0.0055 | S=0.010 | ETA 120s
+[ablate] 23/48 L2.B6: story +0.0068 math +0.0044 code +0.0064 | S=0.015 | ETA 115s
+[ablate] 24/48 L2.B7: story +0.0071 math +0.0071 code +0.0061 | S=0.002 | ETA 110s
+[ablate] 25/48 L3.B0: story +0.0098 math +0.0131 code +0.0055 | S=0.050 | ETA 105s
+[ablate] 26/48 L3.B1: story +0.0102 math +0.0082 code +0.0054 | S=0.029 | ETA 100s
+[ablate] 27/48 L3.B2: story +0.0090 math +0.0092 code +0.0043 | S=0.045 | ETA 96s
+[ablate] 28/48 L3.B3: story +0.0083 math +0.0114 code +0.0050 | S=0.046 | ETA 91s
+[ablate] 29/48 L3.B4: story +0.0093 math +0.0067 code +0.0039 | S=0.051 | ETA 86s
+[ablate] 30/48 L3.B5: story +0.0092 math +0.0080 code +0.0038 | S=0.055 | ETA 82s
+[ablate] 31/48 L3.B6: story +0.0093 math +0.0098 code +0.0061 | S=0.019 | ETA 77s
+[ablate] 32/48 L3.B7: story +0.0092 math +0.0097 code +0.0054 | S=0.027 | ETA 73s
+[ablate] 33/48 L4.B0: story +0.0104 math +0.0084 code +0.0078 | S=0.007 | ETA 68s
+[ablate] 34/48 L4.B1: story +0.0091 math +0.0065 code +0.0066 | S=0.012 | ETA 63s
+[ablate] 35/48 L4.B2: story +0.0103 math +0.0093 code +0.0070 | S=0.011 | ETA 59s
+[ablate] 36/48 L4.B3: story +0.0115 math +0.0068 code +0.0068 | S=0.031 | ETA 54s
+[ablate] 37/48 L4.B4: story +0.0109 math +0.0107 code +0.0071 | S=0.017 | ETA 50s
+[ablate] 38/48 L4.B5: story +0.0100 math +0.0074 code +0.0082 | S=0.007 | ETA 45s
+[ablate] 39/48 L4.B6: story +0.0108 math +0.0053 code +0.0068 | S=0.040 | ETA 40s
+[ablate] 40/48 L4.B7: story +0.0120 math +0.0062 code +0.0082 | S=0.033 | ETA 36s
+[ablate] 41/48 L5.B0: story +0.0121 math +0.0044 code +0.0122 | S=0.075 | ETA 31s
+[ablate] 42/48 L5.B1: story +0.0136 math +0.0053 code +0.0105 | S=0.060 | ETA 27s
+[ablate] 43/48 L5.B2: story +0.0135 math +0.0061 code +0.0104 | S=0.044 | ETA 22s
+[ablate] 44/48 L5.B3: story +0.0112 math +0.0049 code +0.0097 | S=0.049 | ETA 18s
+[ablate] 45/48 L5.B4: story +0.0164 math +0.0052 code +0.0144 | S=0.086 | ETA 13s
+[ablate] 46/48 L5.B5: story +0.0144 math +0.0057 code +0.0113 | S=0.059 | ETA 9s
+[ablate] 47/48 L5.B6: story +0.0133 math +0.0048 code +0.0106 | S=0.069 | ETA 4s
+[ablate] 48/48 L5.B7: story +0.0132 math +0.0081 code +0.0182 | S=0.045 | ETA 0s
+[ablate] checkpoint iter: 5000
+[ablate] eval: 20 batches x 32 x 256 tokens per domain per condition
+[ablate] unablated val loss: story=2.1328, math=1.4778, code=2.5068
+[ablate] mean specialization S over 48/48 blocks with positive damage: 0.0466
+[ablate] most specialised blocks: 0.1 (S=0.167, worst=code), 0.7 (S=0.146, worst=code), 0.6 (S=0.115, worst=code), 0.4 (S=0.103, worst=code), 1.6 (S=0.092, worst=story)
+[ablate] time: 215s
+[ablate] wrote ablation.csv, ablation_heatmap.png, ablation_summary.txt, block_norms.csv to out_assembly_s0
+
+=================== [6/6] routing and assembly evaluation  (t=1678s) ===================
+[assembly_health_plot] wrote out_assembly_s0/assembly_health.png
+[assemblies] source=final, assemblies per layer: [8, 7, 9, 8, 6, 10], degenerate layers: []
+[assemblies] unablated: story 2.2256 | math 1.4803 | code 2.5206
+[assemblies] 1/48 L0.A0 size 309: story +0.1038 math +0.0218 code +0.2061 | S=0.237 | ETA 410s
+[assemblies] 2/48 L0.A1 size 171: story +0.0703 math +0.0554 code +0.0544 | S=0.006 | ETA 300s
+[assemblies] 3/48 L0.A4 size 140: story +0.9396 math +0.7269 code +1.0247 | S=0.009 | ETA 261s
+[assemblies] 4/48 L0.A5 size 166: story +0.2302 math +0.2632 code +0.3200 | S=0.008 | ETA 241s
+[assemblies] 5/48 L0.A9 size 213: story +0.0511 math +0.5394 code +0.0605 | S=0.475 | ETA 228s
+[assemblies] 6/48 L0.A10 size 154: story +0.0313 math +0.0102 code +0.2302 | S=0.534 | ETA 217s
+[assemblies] 7/48 L0.A11 size 348: story +0.2810 math +0.0448 code +0.1226 | S=0.201 | ETA 209s
+[assemblies] 8/48 L0.A12 size 35: story +0.0052 math +0.0353 code +0.0153 | S=0.213 | ETA 201s
+[assemblies] 9/48 L1.A1 size 196: story +0.0072 math +0.0018 code +0.0143 | S=0.220 | ETA 193s
+[assemblies] 10/48 L1.A2 size 233: story +0.0055 math +0.0042 code +0.0113 | S=0.084 | ETA 186s
+[assemblies] 11/48 L1.A4 size 202: story +0.0059 math +0.0052 code +0.0147 | S=0.107 | ETA 179s
+[assemblies] 12/48 L1.A5 size 144: story +0.0130 math +0.0180 code +0.0289 | S=0.049 | ETA 173s
+[assemblies] 13/48 L1.A6 size 212: story +0.0105 math +0.0052 code +0.0044 | S=0.071 | ETA 167s
+[assemblies] 14/48 L1.A7 size 432: story +0.0391 math +0.0263 code +0.0267 | S=0.016 | ETA 161s
+[assemblies] 15/48 L1.A8 size 117: story +0.0041 math +0.0030 code +0.0105 | S=0.136 | ETA 155s
+[assemblies] 16/48 L2.A0 size 291: story +0.0219 math +0.0103 code +0.0069 | S=0.106 | ETA 149s
+[assemblies] 17/48 L2.A1 size 312: story +0.0097 math +0.0059 code +0.0251 | S=0.162 | ETA 144s
+[assemblies] 18/48 L2.A2 size 154: story +0.0060 math +0.0091 code +0.0286 | S=0.203 | ETA 139s
+[assemblies] 19/48 L2.A3 size 85: story +0.0028 math +0.0020 code +0.0082 | S=0.171 | ETA 134s
+[assemblies] 20/48 L2.A5 size 128: story +0.0041 math +0.0176 code +0.0036 | S=0.248 | ETA 128s
+[assemblies] 21/48 L2.A7 size 219: story +0.0158 math +0.0078 code +0.0049 | S=0.103 | ETA 123s
+[assemblies] 22/48 L2.A8 size 151: story +0.0058 math +0.0029 code +0.0032 | S=0.047 | ETA 119s
+[assemblies] 23/48 L2.A10 size 137: story +0.0069 math +0.0058 code +0.0032 | S=0.041 | ETA 114s
+[assemblies] 24/48 L2.A14 size 59: story +0.0021 math +0.0082 code +0.0025 | S=0.175 | ETA 109s
+[assemblies] 25/48 L3.A0 size 548: story +0.0394 math +0.0804 code +0.0176 | S=0.149 | ETA 104s
+[assemblies] 26/48 L3.A1 size 204: story +0.0119 math +0.0245 code +0.0067 | S=0.122 | ETA 100s
+[assemblies] 27/48 L3.A2 size 144: story +0.0077 math +0.0330 code +0.0031 | S=0.356 | ETA 95s
+[assemblies] 28/48 L3.A3 size 73: story +0.0039 math +0.0112 code +0.0011 | S=0.284 | ETA 90s
+[assemblies] 29/48 L3.A4 size 89: story +0.0037 math +0.0175 code +0.0033 | S=0.273 | ETA 86s
+[assemblies] 30/48 L3.A5 size 171: story +0.0057 math +0.0036 code +0.0246 | S=0.296 | ETA 81s
+[assemblies] 31/48 L3.A7 size 196: story +0.0166 math +0.0124 code +0.0049 | S=0.091 | ETA 77s
+[assemblies] 32/48 L3.A8 size 111: story +0.0057 math +0.0355 code +0.0026 | S=0.451 | ETA 72s
+[assemblies] 33/48 L4.A0 size 738: story +0.0806 math +0.1143 code +0.0322 | S=0.099 | ETA 67s
+[assemblies] 34/48 L4.A1 size 275: story +0.0203 math +0.1423 code +0.0153 | S=0.420 | ETA 63s
+[assemblies] 35/48 L4.A3 size 193: story +0.0105 math +0.0027 code +0.0307 | S=0.305 | ETA 58s
+[assemblies] 36/48 L4.A4 size 175: story +0.0098 math +0.0090 code +0.0091 | S=0.001 | ETA 54s
+[assemblies] 37/48 L4.A5 size 92: story +0.0036 math +0.0038 code +0.0047 | S=0.006 | ETA 49s
+[assemblies] 38/48 L4.A10 size 63: story +0.0033 math +0.0051 code +0.0018 | S=0.071 | ETA 45s
+[assemblies] 39/48 L5.A0 size 197: story +0.0582 math +0.0013 code +0.0116 | S=0.517 | ETA 40s
+[assemblies] 40/48 L5.A1 size 168: story +0.0129 math +0.0088 code +0.0102 | S=0.012 | ETA 36s
+[assemblies] 41/48 L5.A2 size 117: story +0.0065 math +0.0037 code +0.0062 | S=0.025 | ETA 31s
+[assemblies] 42/48 L5.A3 size 171: story +0.0148 math +0.0069 code +0.0190 | S=0.069 | ETA 27s
+[assemblies] 43/48 L5.A5 size 120: story +0.0046 math +0.0004 code +0.0345 | S=0.618 | ETA 22s
+[assemblies] 44/48 L5.A6 size 151: story +0.0103 math +0.0224 code +0.0144 | S=0.046 | ETA 18s
+[assemblies] 45/48 L5.A7 size 110: story +0.0027 math +0.0008 code +0.0259 | S=0.612 | ETA 13s
+[assemblies] 46/48 L5.A8 size 180: story +0.0187 math +0.0432 code +0.0248 | S=0.057 | ETA 9s
+[assemblies] 47/48 L5.A10 size 175: story +0.0372 math +0.0176 code +0.0183 | S=0.060 | ETA 4s
+[assemblies] 48/48 L5.A12 size 147: story +0.0284 math +0.0018 code +0.0068 | S=0.399 | ETA 0s
+[assemblies] random baseline 1/48, 235s
+[assemblies] random baseline 2/48, 257s
+[assemblies] random baseline 3/48, 279s
+[assemblies] random baseline 4/48, 301s
+[assemblies] random baseline 5/48, 322s
+[assemblies] random baseline 6/48, 344s
+[assemblies] random baseline 7/48, 366s
+[assemblies] random baseline 8/48, 387s
+[assemblies] random baseline 9/48, 409s
+[assemblies] random baseline 10/48, 431s
+[assemblies] random baseline 11/48, 452s
+[assemblies] random baseline 12/48, 474s
+[assemblies] random baseline 13/48, 496s
+[assemblies] random baseline 14/48, 518s
+[assemblies] random baseline 15/48, 540s
+[assemblies] random baseline 16/48, 562s
+[assemblies] random baseline 17/48, 583s
+[assemblies] random baseline 18/48, 605s
+[assemblies] random baseline 19/48, 627s
+[assemblies] random baseline 20/48, 649s
+[assemblies] random baseline 21/48, 670s
+[assemblies] random baseline 22/48, 692s
+[assemblies] random baseline 23/48, 713s
+[assemblies] random baseline 24/48, 735s
+[assemblies] random baseline 25/48, 757s
+[assemblies] random baseline 26/48, 779s
+[assemblies] random baseline 27/48, 800s
+[assemblies] random baseline 28/48, 822s
+[assemblies] random baseline 29/48, 844s
+[assemblies] random baseline 30/48, 866s
+[assemblies] random baseline 31/48, 888s
+[assemblies] random baseline 32/48, 909s
+[assemblies] random baseline 33/48, 931s
+[assemblies] random baseline 34/48, 953s
+[assemblies] random baseline 35/48, 974s
+[assemblies] random baseline 36/48, 996s
+[assemblies] random baseline 37/48, 1018s
+[assemblies] random baseline 38/48, 1040s
+[assemblies] random baseline 39/48, 1061s
+[assemblies] random baseline 40/48, 1083s
+[assemblies] random baseline 41/48, 1105s
+[assemblies] random baseline 42/48, 1127s
+[assemblies] random baseline 43/48, 1149s
+[assemblies] random baseline 44/48, 1171s
+[assemblies] random baseline 45/48, 1192s
+[assemblies] random baseline 46/48, 1214s
+[assemblies] random baseline 47/48, 1236s
+[assemblies] random baseline 48/48, 1258s
+[assemblies] source: final (mode of checkpoint: assembly, iter 5000)
+[assemblies] assemblies: 48, per layer [8, 7, 9, 8, 6, 10]
+[assemblies] degenerate layers, left out below: []; dead neurons per layer: [0, 0, 0, 0, 0, 0]
+[assemblies] mean S: 0.1867, bootstrap 95% CI [0.1408, 0.2370]
+[assemblies] random same-size sets, mean S: 0.0618, 95% CI [0.0523, 0.0715]
+[assemblies] real minus random S, 95% CI: [0.0799, 0.1705]
+[assemblies] damage per neuron: real 0.000901, random 0.000227 nats
+[assemblies] size-weighted mean S: 0.1727
+[assemblies] damage-weighted mean S: 0.1409
+[assemblies] mean damage per assembly: 0.1517 nats, max 2.6912
+[assemblies] unablated val loss (second half of val): story=2.2256, math=1.4803, code=2.5206
+[assemblies] per-layer mean S: L0=0.210, L1=0.098, L2=0.139, L3=0.253, L4=0.150, L5=0.241
+[assemblies] time: 1258s
+[assemblies] wrote results to out_assembly_s0
+[assemblies] note: these CIs resample assemblies within one model; they do not cover variation between seeds
+[probe] wrote assembly_probe.csv and assembly_domain_profile.csv to out_assembly_s0 (48 assemblies)
+
+All stages finished in 2953s. Outputs:
+total 353076
+drwxr-xr-x  2 root root      4096 Nov  6 21:47 .
+drwxr-xr-x 13 root root      4096 Nov  6 20:59 ..
+-rw-r--r--  1 root root      3164 Nov  6 21:26 ablation.csv
+-rw-r--r--  1 root root    157804 Nov  6 21:26 ablation_heatmap.png
+-rw-r--r--  1 root root       381 Nov  6 21:26 ablation_summary.txt
+-rw-r--r--  1 root root     98856 Nov  6 21:22 assemblies.csv
+-rw-r--r--  1 root root     28963 Nov  6 21:22 assemblies_final.json
+-rw-r--r--  1 root root      3281 Nov  6 21:47 assembly_ablation.csv
+-rw-r--r--  1 root root      6930 Nov  6 21:47 assembly_domain_profile.csv
+-rw-r--r--  1 root root    179478 Nov  6 21:26 assembly_health.png
+-rw-r--r--  1 root root    190271 Nov  6 21:47 assembly_heatmap.png
+-rw-r--r--  1 root root     11987 Nov  6 21:47 assembly_probe.csv
+-rw-r--r--  1 root root     10153 Nov  6 21:47 assembly_random.csv
+-rw-r--r--  1 root root     45064 Nov  6 21:47 assembly_sizes.png
+-rw-r--r--  1 root root      1563 Nov  6 21:47 assembly_summary.json
+-rw-r--r--  1 root root       677 Nov  6 21:47 assembly_summary.txt
+-rw-r--r--  1 root root      1436 Nov  6 21:26 block_norms.csv
+-rw-r--r--  1 root root 360646063 Nov  6 21:22 ckpt.pt
+-rw-r--r--  1 root root     95518 Nov  6 21:23 loss_curves.png
+-rw-r--r--  1 root root      2158 Nov  6 21:22 metrics.csv
+-rw-r--r--  1 root root      3357 Nov  6 21:23 samples.txt
+-rw-r--r--  1 root root       439 Nov  6 21:22 summary.txt
