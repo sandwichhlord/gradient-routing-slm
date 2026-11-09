@@ -27,7 +27,8 @@ These times are estimates; nothing in v3 has run on a GPU. The new data changes 
 1. `metrics.csv`: loss falls smoothly with no NaN, `act_norm_l*` stays near dense, and there is no lasting jump at step 500 when gating starts.
 2. `gating.csv`: selection shares near k/G = 0.375 per group; no group stuck near 0 or 1. Evolved: `gating_layers.csv` shows `moved_last` at or below 76 (5% of 1536) and sizes that change slowly.
 3. `gating_layers.csv`: the `ctx_*_effect` columns over training.
-4. `damage_summary.txt`, `failure_trace_summary.txt`, `unlearn_summary.txt`, `context_sensitivity.txt`, then `results/comparison_gated.csv`.
+4. `damage_summary.txt`, `failure_trace_summary.txt`, `unlearn_summary.txt`, `context_sensitivity.txt`, then `results/comparison_gated.csv` and `results/group_sizes.csv`. Functional claims use only the format-matched rows; `format_*` rows are context.
+5. Gate gradient (`--gate_grad 1`, the default): on a CPU smoke run it raised activation norms in the gated layers to about 3.6x dense and story loss by 24%. If the first gated run fails the health criterion below, rerun with `EXTRA_ENV={"GATE_GRAD": "0"}`.
 
 ## Pre-registered success criteria (2026-11-09, committed before any v3 result exists)
 

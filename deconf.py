@@ -1,19 +1,24 @@
 """Deconfounding data, per-token category tags, held-out arithmetic and context probes.
 
-The original corpus confounds three things: digits only appear in arithmetic, arithmetic only appears as digits, and
-code never computes. The deconfounding data breaks those links with three synthetic generators, each kept in the
-domain its surface form belongs to:
+The original corpus confounds three things: digits only appear in arithmetic, arithmetic only appears as digits (and
+only in the Q/A format), and code never computes. The deconfounding data breaks those links with synthetic generators,
+each kept in the domain its surface form belongs to:
   word problems (math)      "three plus four makes seven."           arithmetic without digits
+  prose arithmetic (math)   "She added 37 and 48 and got 85."        arithmetic with digits, in prose (not Q/A format)
   number stories (story)    "Mia was 7 and had 3 cats."              digits (and number words) without arithmetic
   code arithmetic (code)    "x = 37 + 48"                            arithmetic inside code
+Math deconfounding documents mix word-problem and prose-arithmetic lines.
 
 Tags (one per token, used for evaluation only, never for training):
-  0 digit_in_arith_answer         digit tokens after "A:" in a "Q: a op b = A: c" line
+  0 digit_in_arith_answer         digit tokens after "A:" in a "Q: a op b = A: c" line (Q/A format)
   1 digit_in_story                digit tokens in story-domain text
   2 number_word_in_word_problem   number words (zero..twenty, tens, hundred) in math-domain text
   3 story_word                    other alphabetic tokens in story-domain text
   4 code_keyword_or_indent        Python keywords and whitespace-only (indentation) tokens in code-domain text
-  5 other                         everything else
+  5 digit_in_prose_arith          digit tokens in math-domain text outside Q/A lines (prose arithmetic)
+  6 other                         everything else
+Format-matched comparisons (prose against prose): digit_in_prose_arith vs digit_in_story, and number words in word
+problems vs number words in stories. digit_in_arith_answer differs from stories in format too ("format" comparisons).
 Tags depend only on the token, its domain and (for answers) the preceding tokens, so they are the same for real and
 synthetic text.
 
@@ -27,7 +32,8 @@ import numpy as np
 
 DOMAINS = ["story", "math", "code"]
 TAGS = ["digit_in_arith_answer", "digit_in_story", "number_word_in_word_problem", "story_word", "code_keyword_or_indent",
-        "other"]
+        "digit_in_prose_arith", "other"]
+DATA_VERSION = 2   # bump when the generated data or the tags change (part of prepare.py's rebuild signature)
 TAG_ID = {t: i for i, t in enumerate(TAGS)}
 OTHER = TAG_ID["other"]
 
@@ -118,6 +124,35 @@ def word_problem_doc(rng):
     return "\n".join(_word_problem_line(rng) for _ in range(rng.randint(6, 10)))
 
 
+def prose_arith_line(rng):
+    """Arithmetic with digits written as prose, e.g. "Mia added 37 and 48 and got 85." Held-out problems are skipped."""
+    while True:
+        kind = rng.choice(["+", "+", "-", "x"])
+        if kind == "x":
+            a, b = rng.randint(0, 12), rng.randint(0, 12)
+        elif kind == "-":
+            a = rng.randint(0, 99)
+            b = rng.randint(0, a)
+        else:
+            a, b = rng.randint(0, 99), rng.randint(0, 99)
+        if not is_heldout(a, kind, b):
+            break
+    c, n, t = answer(a, kind, b), rng.choice(NAMES), rng.choice(THINGS)
+    if kind == "+":
+        return rng.choice([f"{n} added {a} and {b} and got {c}.",
+                           f"{n} had {a} {t}s and found {b} more, so {n} had {c} {t}s."])
+    if kind == "-":
+        return rng.choice([f"{n} had {a} {t}s and gave {b} away, which left {c}.",
+                           f"{n} took {b} away from {a} and got {c}."])
+    return f"When {n} multiplied {a} by {b}, the answer was {c}."
+
+
+def math_deconf_doc(rng):
+    """Word-problem and prose-arithmetic lines, mixed."""
+    return "\n".join((_word_problem_line if rng.random() < 0.5 else prose_arith_line)(rng)
+                     for _ in range(rng.randint(6, 10)))
+
+
 def _story_number(rng, style):
     """A number for a story: digits, a number word, or either (style "digits", "words" or "mixed")."""
     if style == "words" or (style == "mixed" and rng.random() < 0.3):
@@ -158,7 +193,7 @@ def code_arith_doc(rng):
     return "\n".join(lines) + "\n"
 
 
-DECONF_KINDS = {"math": word_problem_doc, "story": number_story, "code": code_arith_doc}
+DECONF_KINDS = {"math": math_deconf_doc, "story": number_story, "code": code_arith_doc}
 
 
 def deconf_docs_iter(domain, rng):
@@ -189,10 +224,10 @@ def vocab_tables(enc):
             alpha[i] = bool(st) and st.isalpha() and st.isascii()
             kw_indent[i] = st in keywords or (s != "" and s.strip(" \t") == "" and ("\n" not in s))
             newline[i] = "\n" in s
-        a_colon = enc.encode_ordinary(" A:")
-        assert len(a_colon) == 2, a_colon
+        a_colon, q_colon = enc.encode_ordinary(" A:"), enc.encode_ordinary("Q:")
+        assert len(a_colon) == 2 and len(q_colon) == 2 and a_colon[1] == q_colon[1], (a_colon, q_colon)
         _TABLES[key] = dict(digit=digit, numword=numword, alpha=alpha, kw_indent=kw_indent, newline=newline,
-                            a_tok=a_colon[0], colon=a_colon[1], eot=enc.eot_token)
+                            a_tok=a_colon[0], q_tok=q_colon[0], colon=a_colon[1], eot=enc.eot_token)
     return _TABLES[key]
 
 
@@ -208,13 +243,17 @@ def tag_tokens(ids, domain, enc):
         tags[t["digit"][ids]] = TAG_ID["digit_in_story"]
     elif domain == "math":
         pos = np.arange(len(ids))
-        start = np.zeros(len(ids), dtype=bool)
+        start, qline = np.zeros(len(ids), dtype=bool), np.zeros(len(ids), dtype=bool)
         start[1:] = (ids[1:] == t["colon"]) & (ids[:-1] == t["a_tok"])
+        qline[:-1] = (ids[:-1] == t["q_tok"]) & (ids[1:] == t["colon"])       # "Q:" opens a Q/A line
         reset = t["newline"][ids] | (ids == t["eot"])
         last_start = np.maximum.accumulate(np.where(start, pos, -1))
+        last_q = np.maximum.accumulate(np.where(qline, pos, -1))
         last_reset = np.maximum.accumulate(np.where(reset, pos, -1))
         in_answer = (last_start > last_reset) & (pos > last_start)
+        in_qa = last_q > last_reset
         tags[t["numword"][ids]] = TAG_ID["number_word_in_word_problem"]
+        tags[~in_qa & t["digit"][ids]] = TAG_ID["digit_in_prose_arith"]
         tags[in_answer & t["digit"][ids]] = TAG_ID["digit_in_arith_answer"]
     elif domain == "code":
         tags[t["kw_indent"][ids]] = TAG_ID["code_keyword_or_indent"]
@@ -224,16 +263,21 @@ def tag_tokens(ids, domain, enc):
 
 
 # ------------------------------------------------------------------------------ context probes
-PROBE_PAIRS = [("digits", "arith", "story_digits"), ("number_words", "word_problem", "story_words")]
+# (name, context a, context b, kind). "matched": both contexts are prose, so only the function differs (the primary
+# comparisons). "format": Q/A lines against prose, where format and function both differ.
+PROBE_PAIRS = [("number_words", "word_problem", "story_words", "matched"),
+               ("prose_digits", "prose_arith", "story_digits", "matched"),
+               ("qa_digits", "arith", "story_digits", "format")]
 
 
 def build_context_probes(enc, n_seqs=64, seq_len=128, seed=4242):
     """Token windows for eval/context_sensitivity.py: {context: (tokens (N, T) int64, mask (N, T) bool)}. The mask marks
-    digit tokens (arith, story_digits) or number-word tokens (word_problem, story_words)."""
+    digit tokens (arith, prose_arith, story_digits) or number-word tokens (word_problem, story_words)."""
     t = vocab_tables(enc)
     rng = random.Random(seed)
     makers = {"arith": (lambda: "\n".join(math_line(rng) for _ in range(20)), "digit"),
               "story_digits": (lambda: number_story(rng, "digits"), "digit"),
+              "prose_arith": (lambda: "\n".join(prose_arith_line(rng) for _ in range(8)), "digit"),
               "word_problem": (lambda: word_problem_doc(rng), "numword"),
               "story_words": (lambda: number_story(rng, "words"), "numword")}
     out = {}

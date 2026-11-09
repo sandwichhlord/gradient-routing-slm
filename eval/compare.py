@@ -10,6 +10,10 @@ Gated-mode table (results/comparison_gated.csv): one row per group of runs that 
 gated_fixed, gated_evolved, ...): final val loss, damage-table classes and mean damage per category
 (damage_summary.json), held-out arithmetic accuracy and failure-trace numbers (failure_trace_summary.json), unlearning
 before/after (unlearn_summary.json) and context-sensitivity effects at route_smooth 0 and 0.9 (context_sensitivity.json).
+The primary rows are format-matched (prose arithmetic and word problems against stories). Rows starting with format_
+compare Q/A-format arithmetic with stories, where format differs as well as function.
+Group sizes (results/group_sizes.csv): min / median / max neurons per layer for every run with groups_final.json, and a
+FLAG for an evolved run whose groups are all within 20% of equal size in every layer.
 """
 import argparse
 import csv
@@ -89,9 +93,12 @@ GATED = [
     ("val_story", None), ("val_math", None), ("val_code", None),
     ("n_lexical", ("damage_summary.json", lambda j: j["classes"]["lexical"])),
     ("n_functional", ("damage_summary.json", lambda j: j["classes"]["functional"])),
-    ("dmg_arith_digit", ("damage_summary.json", lambda j: j["mean_damage"].get("tag_digit_in_arith_answer"))),
+    ("format_n_lexical", ("damage_summary.json", lambda j: j["format_classes"]["lexical"])),
+    ("format_n_functional", ("damage_summary.json", lambda j: j["format_classes"]["functional"])),
+    ("dmg_prose_digit", ("damage_summary.json", lambda j: j["mean_damage"].get("tag_digit_in_prose_arith"))),
     ("dmg_story_digit", ("damage_summary.json", lambda j: j["mean_damage"].get("tag_digit_in_story"))),
     ("dmg_wp_word", ("damage_summary.json", lambda j: j["mean_damage"].get("tag_number_word_in_word_problem"))),
+    ("format_dmg_qa_digit", ("damage_summary.json", lambda j: j["mean_damage"].get("tag_digit_in_arith_answer"))),
     ("arith_acc", ("failure_trace_summary.json", lambda j: j["accuracy"])),
     ("trace_consistency", ("failure_trace_summary.json", lambda j: j["mean_top_consistency"])),
     ("trace_ablate_d_acc", ("failure_trace_summary.json", lambda j: j["joint_accuracy_change"])),
@@ -101,11 +108,33 @@ GATED = [
     ("unlearn_rand_d_acc", ("unlearn_summary.json", lambda j: j["random_accuracy_change"])),
     ("unlearn_d_story", ("unlearn_summary.json", lambda j: j["d_story"])),
     ("unlearn_d_code", ("unlearn_summary.json", lambda j: j["d_code"])),
-    ("ctx_digits_s0", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.0"]["digits"])),
-    ("ctx_digits_s0.9", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.9"]["digits"])),
     ("ctx_words_s0", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.0"]["number_words"])),
     ("ctx_words_s0.9", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.9"]["number_words"])),
+    ("ctx_prose_digits_s0", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.0"]["prose_digits"])),
+    ("ctx_prose_digits_s0.9", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.9"]["prose_digits"])),
+    ("format_ctx_qa_digits_s0", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.0"]["qa_digits"])),
+    ("format_ctx_qa_digits_s0.9", ("context_sensitivity.json", lambda j: j["mean_effect"]["0.9"]["qa_digits"])),
+    ("groups_near_equal", None),
 ]
+NEAR_EQUAL = 0.2   # a layer's groups count as "near equal size" if all are within 20% of hidden / n_groups
+
+
+def group_sizes(folder):
+    """[(layer, n_groups, min, median, max, near_equal)] from groups_final.json (gated runs), else []."""
+    path = os.path.join(folder, "groups_final.json")
+    if not os.path.exists(path):
+        return []
+    with open(path) as f:
+        g = json.load(f)
+    out = []
+    for layer, labels in g["layers"].items():
+        if labels is None:
+            continue
+        sizes = np.bincount(labels, minlength=g["n_groups"])
+        equal = len(labels) / g["n_groups"]
+        out.append((int(layer), g["n_groups"], int(sizes.min()), float(np.median(sizes)), int(sizes.max()),
+                    bool(np.all(np.abs(sizes - equal) <= NEAR_EQUAL * equal))))
+    return out
 GATED_FILES = {"damage_summary.json", "failure_trace_summary.json", "unlearn_summary.json", "context_sensitivity.json"}
 
 
@@ -115,6 +144,10 @@ def read_gated(folder, run):
         return None
     cache, out = {}, {}
     for name, src in GATED:
+        if name == "groups_near_equal":
+            sizes = group_sizes(folder)
+            out[name] = float(all(s[5] for s in sizes)) if sizes else None
+            continue
         if src is None:
             out[name] = run[name]
             continue
@@ -150,14 +183,33 @@ def write_gated_table(runs, folders, out_dir):
                 row += [fmt(statistics.mean(vals)) if vals else "", fmt(statistics.stdev(vals)) if len(vals) > 1 else ""]
             w.writerow(row)
     print()
-    print(f"{'metric':22s}" + "".join(f"{g:>18s}" for g in groups))
+    print(f"{'metric':26s}" + "".join(f"{g:>18s}" for g in groups))
     for m in names:
         cells = []
         for g in groups:
             vals = [r[m] for r in by_group[g] if r[m] is not None]
             cells.append(f"{(fmt(statistics.mean(vals), 3) + (f' (n={len(vals)})' if len(vals) > 1 else '')) if vals else '-':>18s}")
-        print(f"{m:22s}" + "".join(cells))
+        print(f"{m:26s}" + "".join(cells))
+    print("(format_* rows compare Q/A-format arithmetic with prose: format and function both differ, so they support no "
+          "functional claim)")
     print(f"[compare] wrote comparison_gated.csv to {out_dir}")
+
+    size_rows = [(name, *s) for name in rows for s in group_sizes(folders[name])]
+    if size_rows:
+        with open(os.path.join(out_dir, "group_sizes.csv"), "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["run", "layer", "n_groups", "min", "median", "max", "near_equal"])
+            w.writerows(size_rows)
+        print()
+        print(f"group sizes (neurons) per layer; near_equal = all within {NEAR_EQUAL:.0%} of equal size:")
+        for name, layer, G, lo, med, hi, near in size_rows:
+            print(f"  {name:28s} L{layer}: min {lo:4d}  median {med:6.1f}  max {hi:4d}  "
+                  + ("NEAR EQUAL" if near else ""))
+        flagged = sorted({n for n, *_, near in size_rows if near and "evolved" in n and
+                          all(r[-1] for r in size_rows if r[0] == n)})
+        for n in flagged:
+            print(f"  FLAG: {n}: every layer's evolved groups are within {NEAR_EQUAL:.0%} of equal size "
+                  f"(close to the fixed partition)")
 
 
 def summarise(runs):
