@@ -25,7 +25,7 @@ These times are estimates; nothing in v3 has run on a GPU. The new data changes 
 
 **Check each run, in order:**
 1. `metrics.csv`: loss falls smoothly with no NaN, `act_norm_l*` stays near dense, and there is no lasting jump at step 500 when gating starts.
-2. `gating.csv`: selection shares near k/G = 0.375 per group; no group stuck near 0 or 1. Evolved: `gating_layers.csv` shows `moved_last` at or below 76 (5% of 1536) and sizes that change slowly.
+2. `gating.csv`: selection shares near k/G = 0.5 per group; no group stuck near 0 or 1. Evolved: `gating_layers.csv` shows `moved_last` at or below 76 (5% of 1536) and sizes that change slowly.
 3. `gating_layers.csv`: the `ctx_*_effect` columns over training.
 4. `damage_summary.txt`, `failure_trace_summary.txt`, `unlearn_summary.txt`, `context_sensitivity.txt`, then `results/comparison_gated.csv` and `results/group_sizes.csv`. Functional claims use only the format-matched rows; `format_*` rows are context.
 5. Health against dense, per the pre-registered criteria below. The gate default was chosen before any GPU run (next section).
@@ -44,6 +44,19 @@ These times are estimates; nothing in v3 has run on a GPU. The new data changes 
 | gate_grad 1 + share | 2.958 / 3.394 / 2.700 (+3.9%, +0.1%, -1.4%) | 0.856 / 0.579 | 1.22 / 1.16 |
 
 **Decision:** `--gate_grad 1 --gate_score share` meets both conditions (worst loss +3.9%, worst norm ratio 1.22x), so it is the default for all gated runs. `GATE_SCORE=relative` and `GATE_GRAD=0` remain available. With the relative score, the gate gradient rewards raising activity against a lagging baseline, which matches the norm growth seen; the share score is unchanged when every activation is scaled. This is a smoke run on a tiny model and synthetic data, not evidence about the full-scale result. The post-hoc groups of dense runs also use the share score, so dense and gated are scored the same way.
+
+## Pre-GPU design decision: k = 4 of 8 groups (2026-11-09)
+
+**Decision:** the gated default is `--gate_k 4` (was 3), for `gated_fixed` and `gated_evolved` alike (both read the same `gate_k` setting), and for the post-hoc groups of dense runs.
+
+**Reason:** the inference-only gating-cost check on the old dense run (`docs/findings.md`, section 11; share score, smoothing 0.9, layers 2-5) gave, against ungated:
+
+| k of 8 | Story | Math | Code |
+|---|---|---|---|
+| 3 | +10.9% | +19.7% | +13.5% |
+| 4 | +6.7% | +9.9% | +7.7% |
+
+At k = 3 the math cost (+19.7%) is above the 15% per-domain loss limit of the pre-registered health criterion; at k = 4 every domain is under 10%. This is the cost on a model that never trained with gates, not a prediction of the trained runs' final loss. The pre-registered criteria are unchanged.
 
 ## Pre-registered success criteria (2026-11-09, committed before any v3 result exists)
 

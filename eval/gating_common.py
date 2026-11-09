@@ -37,7 +37,7 @@ def add_args(p, windows=96):
     # post-hoc groups (dense checkpoints only; a gated checkpoint uses its own settings)
     p.add_argument("--gated_layers", default="2,3,4,5")
     p.add_argument("--n_groups", type=int, default=8)
-    p.add_argument("--gate_k", type=int, default=3)
+    p.add_argument("--gate_k", type=int, default=4)
     p.add_argument("--route_smooth", type=float, default=0.9)
     p.add_argument("--gate_score", default="share", choices=["share", "relative"])
     p.add_argument("--posthoc_batches", type=int, default=200, help="batches of the first val half for clustering")
