@@ -6,3 +6,9 @@ out_*/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+# Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
